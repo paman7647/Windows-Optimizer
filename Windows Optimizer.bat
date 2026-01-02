@@ -541,29 +541,82 @@ if errorlevel 1 goto :CLEANTEMP
 :REGISTRY
     cls
     echo  --------------------------------------------------------
-    echo   Registry Settings
+    echo   Advanced Registry Optimization Suite
     echo  --------------------------------------------------------
     echo.
     echo  WARNING: Create a system restore point before proceeding!
+    echo  These optimizations can significantly impact system behavior.
     echo.
-    call :CREATE_RESTORE_POINT "Registry Optimizations"
-    echo  Choose a registry optimization:
-    echo    1.  Disable Unnecessary Visual Effects 
-    echo    2.  Disable Windows Defender (Not Recommended!)
-    echo    3.  Enable "Ultimate Performance" Power Plan 
-    echo    4.  Disable Superfetch Service 
-    echo    5.  Disable Prefetch 
-    echo    6.  Boost Menu Responsiveness 
-    echo    7.  Back to Main Menu 
+    call :CREATE_RESTORE_POINT "Advanced Registry Optimizations"
+    echo  Choose a registry optimization category:
     echo.
-    choice /c 1234567 /n /m "Enter your choice: "
+    echo  [PERFORMANCE OPTIMIZATIONS]
+    echo    1.  Disable Unnecessary Visual Effects
+    echo    2.  Optimize Memory Management
+    echo    3.  Enable Best Performance Power Settings
+    echo    4.  Disable Superfetch/SysMain Service
+    echo    5.  Disable Prefetch & Superfetch
+    echo    6.  Boost Menu & System Responsiveness
+    echo    7.  Optimize CPU Core Parking
+    echo    8.  Disable Windows Animations
+    echo.
+    echo  [INTERNET & NETWORK OPTIMIZATIONS]
+    echo    9.  Optimize TCP/IP Stack
+    echo   10.  Disable Nagle's Algorithm
+    echo   11.  Increase Network Throughput
+    echo   12.  Optimize DNS Settings
+    echo   13.  Disable Windows Auto-Tuning
+    echo.
+    echo  [GAMING OPTIMIZATIONS]
+    echo   14.  Optimize Gaming Performance
+    echo   15.  Disable Game DVR & Game Bar
+    echo   16.  Optimize GPU Settings
+    echo   17.  Disable Xbox Accessories
+    echo.
+    echo  [PRIVACY & SECURITY OPTIMIZATIONS]
+    echo   18.  Disable Telemetry & Data Collection
+    echo   19.  Disable Windows Defender (Not Recommended!)
+    echo   20.  Disable Cortana & Web Search
+    echo   21.  Disable Activity History
+    echo   22.  Optimize Privacy Settings
+    echo.
+    echo  [SYSTEM OPTIMIZATIONS]
+    echo   23.  Disable Windows Tips & Suggestions
+    echo   24.  Optimize Windows Search
+    echo   25.  Disable Windows Error Reporting
+    echo   26.  Optimize Startup & Boot
+    echo   27.  Disable Unnecessary Services
+    echo   28.  Back to Main Menu
+    echo.
+    choice /c 123456789ABCDEFGHIJKLMN /n /m "Enter your choice (A=10, B=11, C=12, D=13, E=14, F=15, G=16, H=17, I=18, J=19, K=20, L=21, M=22, N=23): "
 
-    if errorlevel 7 goto :MAIN_MENU
+    if errorlevel 28 goto :MAIN_MENU
+    if errorlevel 27 goto :DISABLE_UNNECESSARY_SERVICES
+    if errorlevel 26 goto :OPTIMIZE_STARTUP_BOOT
+    if errorlevel 25 goto :DISABLE_ERROR_REPORTING
+    if errorlevel 24 goto :OPTIMIZE_WINDOWS_SEARCH
+    if errorlevel 23 goto :DISABLE_TIPS_SUGGESTIONS
+    if errorlevel 22 goto :OPTIMIZE_PRIVACY_SETTINGS
+    if errorlevel 21 goto :DISABLE_ACTIVITY_HISTORY
+    if errorlevel 20 goto :DISABLE_CORTANA_SEARCH
+    if errorlevel 19 goto :DISABLE_DEFENDER
+    if errorlevel 18 goto :DISABLE_TELEMETRY
+    if errorlevel 17 goto :DISABLE_XBOX_ACCESSORIES
+    if errorlevel 16 goto :OPTIMIZE_GPU_SETTINGS
+    if errorlevel 15 goto :DISABLE_GAME_DVR
+    if errorlevel 14 goto :OPTIMIZE_GAMING_PERFORMANCE
+    if errorlevel 13 goto :DISABLE_AUTO_TUNING
+    if errorlevel 12 goto :OPTIMIZE_DNS_SETTINGS
+    if errorlevel 11 goto :INCREASE_NETWORK_THROUGHPUT
+    if errorlevel 10 goto :DISABLE_NAGLE_ALGORITHM
+    if errorlevel 9 goto :OPTIMIZE_TCP_STACK
+    if errorlevel 8 goto :DISABLE_ANIMATIONS
+    if errorlevel 7 goto :OPTIMIZE_CPU_PARKING
     if errorlevel 6 goto :BOOST_MENU
     if errorlevel 5 goto :DISABLE_PREFETCH
     if errorlevel 4 goto :DISABLE_SUPERFETCH
     if errorlevel 3 goto :ENABLE_BEST_REGISTRY
-    if errorlevel 2 goto :DISABLE_DEFENDER
+    if errorlevel 2 goto :OPTIMIZE_MEMORY_MANAGEMENT
     if errorlevel 1 goto :DISABLE_VISUAL_EFFECTS
 
 :DISABLE_VISUAL_EFFECTS
@@ -612,10 +665,262 @@ if errorlevel 1 goto :CLEANTEMP
 
 :BOOST_MENU
     reg add "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile" /v "SystemResponsiveness" /t REG_DWORD /d 1 /f >nul 2>&1
-    echo  - Registry key HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile\SystemResponsiveness set to 1. 
-    echo  - Menu responsiveness boosted. 
+    echo  - Registry key HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile\SystemResponsiveness set to 1.
+    echo  - Menu responsiveness boosted.
     pause
     goto :REGISTRY
+
+:: NEW ADVANCED REGISTRY OPTIMIZATIONS
+
+:OPTIMIZE_MEMORY_MANAGEMENT
+    echo.
+    echo  Optimizing Memory Management...
+    reg add "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management" /v "LargeSystemCache" /t REG_DWORD /d 0 /f >nul 2>&1
+    reg add "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management" /v "DisablePagingExecutive" /t REG_DWORD /d 1 /f >nul 2>&1
+    reg add "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management" /v "ClearPageFileAtShutdown" /t REG_DWORD /d 0 /f >nul 2>&1
+    reg add "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management" /v "FeatureSettingsOverride" /t REG_DWORD /d 3 /f >nul 2>&1
+    reg add "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management" /v "FeatureSettingsOverrideMask" /t REG_DWORD /d 3 /f >nul 2>&1
+    echo  - Memory management optimized for better performance.
+    pause
+    goto :REGISTRY
+
+:OPTIMIZE_CPU_PARKING
+    echo.
+    echo  Optimizing CPU Core Parking...
+    reg add "HKLM\SYSTEM\CurrentControlSet\Control\Power\PowerSettings\54533251-82be-4824-96c1-47b60b740d00\75b0ae3f-bce0-45a7-8c89-c9611c224f84" /v "Attributes" /t REG_DWORD /d 2 /f >nul 2>&1
+    reg add "HKLM\SYSTEM\ControlSet001\Control\Power\PowerSettings\54533251-82be-4824-96c1-47b60b740d00\0cc5b647-c1df-4637-891a-dec35c318583" /v "Attributes" /t REG_DWORD /d 2 /f >nul 2>&1
+    reg add "HKLM\SYSTEM\CurrentControlSet\Control\Power\PowerSettings\54533251-82be-4824-96c1-47b60b740d00\75b0ae3f-bce0-45a7-8c89-c9611c224f84" /v "Value" /t REG_DWORD /d 0 /f >nul 2>&1
+    echo  - CPU core parking optimized for better performance.
+    pause
+    goto :REGISTRY
+
+:DISABLE_ANIMATIONS
+    echo.
+    echo  Disabling Windows Animations...
+    reg add "HKCU\Control Panel\Desktop\WindowMetrics" /v "MinAnimate" /t REG_SZ /d "0" /f >nul 2>&1
+    reg add "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v "TaskbarAnimations" /t REG_DWORD /d 0 /f >nul 2>&1
+    reg add "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v "ListviewAlphaSelect" /t REG_DWORD /d 0 /f >nul 2>&1
+    reg add "HKCU\SOFTWARE\Microsoft\Windows\DWM" /v "EnableAeroPeek" /t REG_DWORD /d 0 /f >nul 2>&1
+    echo  - Windows animations disabled for better performance.
+    pause
+    goto :REGISTRY
+
+:OPTIMIZE_TCP_STACK
+    echo.
+    echo  Optimizing TCP/IP Stack...
+    reg add "HKLM\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters" /v "TcpAckFrequency" /t REG_DWORD /d 1 /f >nul 2>&1
+    reg add "HKLM\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters" /v "TcpNoDelay" /t REG_DWORD /d 1 /f >nul 2>&1
+    reg add "HKLM\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters" /v "Tcp1323Opts" /t REG_DWORD /d 1 /f >nul 2>&1
+    reg add "HKLM\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters" /v "MaxFreeTcbs" /t REG_DWORD /d 65536 /f >nul 2>&1
+    reg add "HKLM\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters" /v "MaxHashTableSize" /t REG_DWORD /d 65536 /f >nul 2>&1
+    reg add "HKLM\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters" /v "MaxUserPort" /t REG_DWORD /d 65534 /f >nul 2>&1
+    echo  - TCP/IP stack optimized for better network performance.
+    pause
+    goto :REGISTRY
+
+:DISABLE_NAGLE_ALGORITHM
+    echo.
+    echo  Disabling Nagle's Algorithm...
+    reg add "HKLM\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters" /v "TcpAckFrequency" /t REG_DWORD /d 1 /f >nul 2>&1
+    reg add "HKLM\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters" /v "TcpNoDelay" /t REG_DWORD /d 1 /f >nul 2>&1
+    netsh int tcp set global chimney=enabled >nul 2>&1
+    netsh int tcp set global autotuninglevel=normal >nul 2>&1
+    echo  - Nagle's algorithm disabled for reduced latency.
+    pause
+    goto :REGISTRY
+
+:INCREASE_NETWORK_THROUGHPUT
+    echo.
+    echo  Increasing Network Throughput...
+    reg add "HKLM\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters" /v "GlobalMaxTcpWindowSize" /t REG_DWORD /d 65535 /f >nul 2>&1
+    reg add "HKLM\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters" /v "TcpWindowSize" /t REG_DWORD /d 65535 /f >nul 2>&1
+    reg add "HKLM\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters" /v "MTU" /t REG_DWORD /d 1500 /f >nul 2>&1
+    reg add "HKLM\SOFTWARE\Microsoft\MSMQ\Parameters" /v "TCPNoDelay" /t REG_DWORD /d 1 /f >nul 2>&1
+    echo  - Network throughput increased for better internet speeds.
+    pause
+    goto :REGISTRY
+
+:OPTIMIZE_DNS_SETTINGS
+    echo.
+    echo  Optimizing DNS Settings...
+    reg add "HKLM\SYSTEM\CurrentControlSet\Services\Dnscache\Parameters" /v "MaxCacheTtl" /t REG_DWORD /d 86400 /f >nul 2>&1
+    reg add "HKLM\SYSTEM\CurrentControlSet\Services\Dnscache\Parameters" /v "MaxNegativeCacheTtl" /t REG_DWORD /d 0 /f >nul 2>&1
+    reg add "HKLM\SYSTEM\CurrentControlSet\Services\Dnscache\Parameters" /v "NetFailureCacheTime" /t REG_DWORD /d 0 /f >nul 2>&1
+    reg add "HKLM\SYSTEM\CurrentControlSet\Services\Dnscache\Parameters" /v "NegativeCacheTime" /t REG_DWORD /d 0 /f >nul 2>&1
+    reg add "HKLM\SYSTEM\CurrentControlSet\Services\Dnscache\Parameters" /v "NegativeSOACacheTime" /t REG_DWORD /d 0 /f >nul 2>&1
+    echo  - DNS settings optimized for faster name resolution.
+    pause
+    goto :REGISTRY
+
+:DISABLE_AUTO_TUNING
+    echo.
+    echo  Disabling Windows Auto-Tuning...
+    netsh int tcp set global autotuninglevel=disabled >nul 2>&1
+    reg add "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management" /v "LargeSystemCache" /t REG_DWORD /d 0 /f >nul 2>&1
+    echo  - Windows auto-tuning disabled for consistent network performance.
+    pause
+    goto :REGISTRY
+
+:OPTIMIZE_GAMING_PERFORMANCE
+    echo.
+    echo  Optimizing Gaming Performance...
+    reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile\Tasks\Games" /v "Affinity" /t REG_DWORD /d 0 /f >nul 2>&1
+    reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile\Tasks\Games" /v "Background Only" /t REG_SZ /d "False" /f >nul 2>&1
+    reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile\Tasks\Games" /v "Clock Rate" /t REG_DWORD /d 10000 /f >nul 2>&1
+    reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile\Tasks\Games" /v "GPU Priority" /t REG_DWORD /d 8 /f >nul 2>&1
+    reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile\Tasks\Games" /v "Priority" /t REG_DWORD /d 6 /f >nul 2>&1
+    reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile\Tasks\Games" /v "Scheduling Category" /t REG_SZ /d "High" /f >nul 2>&1
+    reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile\Tasks\Games" /v "SFIO Priority" /t REG_SZ /d "High" /f >nul 2>&1
+    echo  - Gaming performance optimized with priority settings.
+    pause
+    goto :REGISTRY
+
+:DISABLE_GAME_DVR
+    echo.
+    echo  Disabling Game DVR and Game Bar...
+    reg add "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\GameDVR" /v "AppCaptureEnabled" /t REG_DWORD /d 0 /f >nul 2>&1
+    reg add "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\GameDVR" /v "AudioCaptureEnabled" /t REG_DWORD /d 0 /f >nul 2>&1
+    reg add "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\GameDVR" /v "CursorCaptureEnabled" /t REG_DWORD /d 0 /f >nul 2>&1
+    reg add "HKCU\System\GameConfigStore" /v "GameDVR_Enabled" /t REG_DWORD /d 0 /f >nul 2>&1
+    reg add "HKLM\SOFTWARE\Microsoft\PolicyManager\default\ApplicationManagement\AllowGameDVR" /v "value" /t REG_DWORD /d 0 /f >nul 2>&1
+    echo  - Game DVR and Game Bar disabled for better gaming performance.
+    pause
+    goto :REGISTRY
+
+:OPTIMIZE_GPU_SETTINGS
+    echo.
+    echo  Optimizing GPU Settings...
+    reg add "HKLM\SYSTEM\CurrentControlSet\Control\GraphicsDrivers" /v "HwSchMode" /t REG_DWORD /d 2 /f >nul 2>&1
+    reg add "HKLM\SYSTEM\CurrentControlSet\Control\GraphicsDrivers" /v "TdrDelay" /t REG_DWORD /d 10 /f >nul 2>&1
+    reg add "HKLM\SOFTWARE\Microsoft\Windows\Dwm" /v "EnableAeroPeek" /t REG_DWORD /d 0 /f >nul 2>&1
+    echo  - GPU settings optimized for better graphics performance.
+    pause
+    goto :REGISTRY
+
+:DISABLE_XBOX_ACCESSORIES
+    echo.
+    echo  Disabling Xbox Accessories...
+    reg add "HKCU\SOFTWARE\Microsoft\GameBar" /v "ShowStartupPanel" /t REG_DWORD /d 0 /f >nul 2>&1
+    reg add "HKCU\SOFTWARE\Microsoft\GameBar" /v "GamePanelStartupTipIndex" /t REG_DWORD /d 3 /f >nul 2>&1
+    reg add "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\GameDVR" /v "AppCaptureEnabled" /t REG_DWORD /d 0 /f >nul 2>&1
+    reg add "HKLM\SOFTWARE\Microsoft\WindowsRuntime\ActivatableClassId\Windows.Gaming.GameBar.PresenceServer.1" /v "ActivationType" /t REG_DWORD /d 0 /f >nul 2>&1
+    echo  - Xbox accessories and Game Bar disabled.
+    pause
+    goto :REGISTRY
+
+:DISABLE_TELEMETRY
+    echo.
+    echo  Disabling Telemetry and Data Collection...
+    reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\DataCollection" /v "AllowTelemetry" /t REG_DWORD /d 0 /f >nul 2>&1
+    reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\DataCollection" /v "AllowTelemetry" /t REG_DWORD /d 0 /f >nul 2>&1
+    reg add "HKLM\SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Policies\DataCollection" /v "AllowTelemetry" /t REG_DWORD /d 0 /f >nul 2>&1
+    reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Diagnostics\DiagTrack" /v "ShowedToastAtLevel" /t REG_DWORD /d 1 /f >nul 2>&1
+    sc config DiagTrack start= disabled >nul 2>&1
+    sc stop DiagTrack >nul 2>&1
+    echo  - Telemetry and data collection disabled for better privacy.
+    pause
+    goto :REGISTRY
+
+:DISABLE_CORTANA_SEARCH
+    echo.
+    echo  Disabling Cortana and Web Search...
+    reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\Windows Search" /v "AllowCortana" /t REG_DWORD /d 0 /f >nul 2>&1
+    reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\Windows Search" /v "AllowSearchToUseLocation" /t REG_DWORD /d 0 /f >nul 2>&1
+    reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\Windows Search" /v "ConnectedSearchUseWeb" /t REG_DWORD /d 0 /f >nul 2>&1
+    reg add "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Search" /v "CortanaConsent" /t REG_DWORD /d 0 /f >nul 2>&1
+    reg add "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Search" /v "SearchboxTaskbarMode" /t REG_DWORD /d 0 /f >nul 2>&1
+    echo  - Cortana and web search disabled for better privacy and performance.
+    pause
+    goto :REGISTRY
+
+:DISABLE_ACTIVITY_HISTORY
+    echo.
+    echo  Disabling Activity History...
+    reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\System" /v "EnableActivityFeed" /t REG_DWORD /d 0 /f >nul 2>&1
+    reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\System" /v "PublishUserActivities" /t REG_DWORD /d 0 /f >nul 2>&1
+    reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\System" /v "UploadUserActivities" /t REG_DWORD /d 0 /f >nul 2>&1
+    reg add "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Privacy" /v "TailoredExperiencesWithDiagnosticDataEnabled" /t REG_DWORD /d 0 /f >nul 2>&1
+    echo  - Activity history and tracking disabled.
+    pause
+    goto :REGISTRY
+
+:OPTIMIZE_PRIVACY_SETTINGS
+    echo.
+    echo  Optimizing Privacy Settings...
+    reg add "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\AdvertisingInfo" /v "Enabled" /t REG_DWORD /d 0 /f >nul 2>&1
+    reg add "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Privacy" /v "TailoredExperiencesWithDiagnosticDataEnabled" /t REG_DWORD /d 0 /f >nul 2>&1
+    reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\DataCollection" /v "AllowTelemetry" /t REG_DWORD /d 0 /f >nul 2>&1
+    reg add "HKCU\SOFTWARE\Microsoft\Speech_OneCore\Settings\OnlineSpeechPrivacy" /v "HasAccepted" /t REG_DWORD /d 0 /f >nul 2>&1
+    reg add "HKCU\SOFTWARE\Microsoft\Personalization\Settings" /v "AcceptedPrivacyPolicy" /t REG_DWORD /d 0 /f >nul 2>&1
+    reg add "HKCU\SOFTWARE\Microsoft\InputPersonalization" /v "RestrictImplicitTextCollection" /t REG_DWORD /d 1 /f >nul 2>&1
+    reg add "HKCU\SOFTWARE\Microsoft\InputPersonalization" /v "RestrictImplicitInkCollection" /t REG_DWORD /d 1 /f >nul 2>&1
+    echo  - Privacy settings optimized across multiple areas.
+    pause
+    goto :REGISTRY
+
+:DISABLE_TIPS_SUGGESTIONS
+    echo.
+    echo  Disabling Windows Tips and Suggestions...
+    reg add "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" /v "SubscribedContent-338389Enabled" /t REG_DWORD /d 0 /f >nul 2>&1
+    reg add "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" /v "SubscribedContent-353694Enabled" /t REG_DWORD /d 0 /f >nul 2>&1
+    reg add "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" /v "SubscribedContent-353696Enabled" /t REG_DWORD /d 0 /f >nul 2>&1
+    reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\CloudContent" /v "DisableWindowsConsumerFeatures" /t REG_DWORD /d 1 /f >nul 2>&1
+    reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\CloudContent" /v "DisableSoftLanding" /t REG_DWORD /d 1 /f >nul 2>&1
+    echo  - Windows tips and suggestions disabled.
+    pause
+    goto :REGISTRY
+
+:OPTIMIZE_WINDOWS_SEARCH
+    echo.
+    echo  Optimizing Windows Search...
+    reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\Windows Search" /v "AllowCortana" /t REG_DWORD /d 0 /f >nul 2>&1
+    reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\Windows Search" /v "AllowSearchToUseLocation" /t REG_DWORD /d 0 /f >nul 2>&1
+    reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\Windows Search" /v "ConnectedSearchUseWeb" /t REG_DWORD /d 0 /f >nul 2>&1
+    reg add "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Search" /v "SearchboxTaskbarMode" /t REG_DWORD /d 0 /f >nul 2>&1
+    reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Search" /v "SearchInFilesMode" /t REG_DWORD /d 0 /f >nul 2>&1
+    echo  - Windows Search optimized for better performance and privacy.
+    pause
+    goto :REGISTRY
+
+:DISABLE_ERROR_REPORTING
+    echo.
+    echo  Disabling Windows Error Reporting...
+    reg add "HKLM\SOFTWARE\Microsoft\Windows\Windows Error Reporting" /v "Disabled" /t REG_DWORD /d 1 /f >nul 2>&1
+    reg add "HKLM\SOFTWARE\Microsoft\Windows\Windows Error Reporting" /v "DontSendAdditionalData" /t REG_DWORD /d 1 /f >nul 2>&1
+    reg add "HKCU\SOFTWARE\Microsoft\Windows\Windows Error Reporting" /v "Disabled" /t REG_DWORD /d 1 /f >nul 2>&1
+    sc config WerSvc start= disabled >nul 2>&1
+    sc stop WerSvc >nul 2>&1
+    echo  - Windows Error Reporting disabled.
+    pause
+    goto :REGISTRY
+
+:OPTIMIZE_STARTUP_BOOT
+    echo.
+    echo  Optimizing Startup and Boot...
+    reg add "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management\PrefetchParameters" /v "EnablePrefetcher" /t REG_DWORD /d 2 /f >nul 2>&1
+    reg add "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management\PrefetchParameters" /v "EnableSuperfetch" /t REG_DWORD /d 2 /f >nul 2>&1
+    reg add "HKLM\SOFTWARE\Microsoft\Dfrg\BootOptimizeFunction" /v "Enable" /t REG_SZ /d "Y" /f >nul 2>&1
+    reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\OptimalLayout" /v "EnableAutoLayout" /t REG_DWORD /d 1 /f >nul 2>&1
+    echo  - Startup and boot performance optimized.
+    pause
+    goto :REGISTRY
+
+:DISABLE_UNNECESSARY_SERVICES
+    echo.
+    echo  Disabling Unnecessary Services...
+    sc config "SysMain" start= disabled >nul 2>&1
+    sc config "WSearch" start= disabled >nul 2>&1
+    sc config "Spooler" start= disabled >nul 2>&1
+    sc config "Fax" start= disabled >nul 2>&1
+    sc config "WpcMonSvc" start= disabled >nul 2>&1
+    sc config "SEMgrSvc" start= disabled >nul 2>&1
+    sc config "PcaSvc" start= disabled >nul 2>&1
+    sc config "Wecsvc" start= disabled >nul 2>&1
+    echo  - Unnecessary services disabled for better performance.
+    echo  - Note: Some services may be re-enabled if needed by applications.
+    pause
+    goto :REGISTRY
+
 
 :: 7. System Policies
 :GPEDIT
