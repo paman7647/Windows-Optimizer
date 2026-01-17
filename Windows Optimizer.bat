@@ -1,4 +1,5 @@
 @echo off
+@chcp 65001 >nul
 setlocal EnableDelayedExpansion
 
 title Windows System Helper
@@ -200,90 +201,140 @@ echo  System Status: [Device: %DeviceType%] [Backup: %BackupDir%]
 echo  Session Started: %date% %time%
 echo.
 echo  ┌─────────────────────────────────────────────────────────────────────────────┐
-echo  │                           WHAT THIS TOOL CAN DO                            │
+echo  │                            OPTIMIZATION MENU                                │
 echo  ├─────────────────────────────────────────────────────────────────────────────┤
-echo  │ • Automatically find and use backup drives    • Restore your system        │
-echo  │ • Help protect your privacy and security       • Improve internet and network│
-echo  │ • Make games run better and smoother           • Speed up your computer     │
-echo  │ • Keep track of what the tool does             • Check hardware performance │
-echo  │ • Control Windows updates and features         • Manage startup programs    │
+echo  │ [1]  Clean Temporary Files         │ [20] Install Useful Software           │
+echo  │ [2]  Restart Explorer              │ [21] Set DNS Settings                  │
+echo  │ [3]  Defragment Disk (HDD)         │ [22] Optimize Network                  │
+echo  │ [4]  Clear Event Logs              │ [23] Backup Drivers                    │
+echo  │ [5]  Network Optimization          │ [24] Hardware Optimization             │
+echo  │ [6]  Registry Fixes                │ [25] Repair System Files               │
+echo  │ [7]  Policies Config               │ [26] Windows Updates Control           │
+echo  │ [8]  Best Performance Mode         │ [27] God Mode (All Settings)           │
+echo  │ [9]  System Responsiveness         │ [28] Power Plans Import                │
+echo  │ [10] Gaming Tweaks                 │ [29] Undo Optimizations                │
+echo  │ [11] Deep Disk Cleanup             │ [30] Check Startup Apps                │
+echo  │ [12] Search Indexing               │ [31] View Logs                         │
+echo  │ [13] Startup Management            │ [32] Privacy Protection                │
+echo  │ [14] Clean Windows.old             │ [33] Complete Backup                   │
+echo  │ [15] Hibernate Toggle              │ [34] Check Drives Info                 │
+echo  │ [16] Auto-Optimize (One Click)     │ [35] System Health                     │
+echo  │ [17] Debloat Windows Apps          │ [36] Internet Speed Test               │
+echo  │ [18] Future Improvements           │ [37] Hardware Diagnostics              │
+echo  │ [19] GPU Optimization              │ [38] Exit                              │
+echo  │ [20] Install Useful Software       │ [39] Run All (Automated)               │
 echo  └─────────────────────────────────────────────────────────────────────────────┘
 echo.
-echo  ┌─────────────────────────────────────────────────────────────────────────────┐
-echo  │                           WHAT WOULD YOU LIKE TO DO?                      │
-echo  ├─────────────────────────────────────────────────────────────────────────────┤
-echo  ├─────────────────────────────────────────────────────────────────────────────┤
-echo  │ [01] Clean up temporary files          [10] Improve gaming performance     │
-echo  │ [02] Restart system processes          [11] Clean up disk space deeply     │
-echo  │ [03] Defragment hard drives            [12] Manage search indexing         │
-echo  │ [04] Clear system logs                 [13] Control startup programs       │
-echo  │ [05] Improve network and internet      [14] Clean up old Windows files     │
-echo  │ [06] Fix system registry settings     [15] Manage hibernation              │
-echo  │ [07] Configure system policies        [16] Apply helpful system tweaks     │
-echo  │ [08] Enable best performance mode     [17] Remove unnecessary Windows apps │
-echo  │ [09] Focus on responsiveness          [18] Future system improvements      │
-echo  │                                       [19] Improve graphics performance    │
-echo  │ EXTRA HELPFUL TOOLS:                  [20] Install useful software          │
-echo  │ [21] Set up DNS settings              [22] Optimize network connections    │
-echo  │ [23] Back up and manage drivers       [24] Tune for your specific device   │
-echo  │ [25] Repair system files              [26] Control Windows updates         │
-echo  │ [27] Enable all settings access       [28] Import better power settings    │
-echo  │ [29] Undo changes and restore         [30] Check startup programs          │
-echo  │ [31] View detailed logs               [32] Protect your privacy            │
-echo  │ [33] Back up all your settings        [34] Check backup drive info         │
-echo  │ [35] Monitor system health            [36] Test internet speed             │
-echo  │ [37] Check hardware health            [38] Exit the tool                   │
-echo  └─────────────────────────────────────────────────────────────────────────────┘
+set /p "choice=Enter option number (1-39): "
+
+if "%choice%"=="1" goto :CLEANTEMP
+if "%choice%"=="2" goto :STARTUP
+if "%choice%"=="3" goto :DEFRAG
+if "%choice%"=="4" goto :CLEAREVENTS
+if "%choice%"=="5" goto :NETWORK_OPTIMIZE
+if "%choice%"=="6" goto :REGISTRY
+if "%choice%"=="7" goto :GPEDIT
+if "%choice%"=="8" goto :BEST_PERFORMANCE
+if "%choice%"=="9" goto :MAX_RESPONSIVENESS
+if "%choice%"=="10" goto :GAMING_TWEAKS
+if "%choice%"=="11" goto :DISK_CLEANUP
+if "%choice%"=="12" goto :DISABLE_SEARCH_INDEXING
+if "%choice%"=="13" goto :OPTIMIZE_STARTUP
+if "%choice%"=="14" goto :CLEAN_WINDOWS_OLD
+if "%choice%"=="15" goto :DISABLE_HIBERNATION
+if "%choice%"=="16" goto :AUTO_OPTIMIZE
+if "%choice%"=="17" goto :DEBLOAT_WINDOWS
+if "%choice%"=="18" goto :FUTURE_IMPROVEMENTS
+if "%choice%"=="19" goto :GPU_OPTIMIZATION
+if "%choice%"=="20" goto :EXTRA_TOOLS
+if "%choice%"=="21" goto :OPTIMIZE_DNS_SETTINGS
+if "%choice%"=="22" goto :NETWORK_OPTIMIZE
+if "%choice%"=="23" goto :DRIVER_BACKUP
+if "%choice%"=="24" goto :HARDWARE_OPTIMIZATION
+if "%choice%"=="25" goto :REPAIR_SYSTEM_FILES
+if "%choice%"=="26" goto :GAMING_SPECIFIC
+if "%choice%"=="27" goto :PRIVACY_OPTIMIZATIONS
+if "%choice%"=="28" goto :COMPLETE_BACKUP_RESTORE
+if "%choice%"=="29" goto :UNDO_OPTIMIZATIONS
+if "%choice%"=="30" goto :SHOW_BACKUP_DRIVE_INFO
+if "%choice%"=="31" goto :DETAILED_LOGGING
+if "%choice%"=="32" goto :PRIVACY_OPTIMIZATIONS
+if "%choice%"=="33" goto :COMPLETE_BACKUP_RESTORE
+if "%choice%"=="34" goto :SHOW_BACKUP_DRIVE_INFO
+if "%choice%"=="35" goto :SYSTEM_HEALTH_MONITOR
+if "%choice%"=="36" goto :NETWORK_SPEED_TEST
+if "%choice%"=="37" goto :HARDWARE_DIAGNOSTICS
+if "%choice%"=="38" goto :eof
+if "%choice%"=="39" goto :RUN_ALL_AUTOMATED
+
 echo.
-echo  ┌─────────────────────────────────────────────────────────────────────────────┐
-echo  │                    HOW TO USE THIS TOOL                                  │
-echo  ├─────────────────────────────────────────────────────────────────────────────┤
-echo  │ Numbers 1-9: Choose options directly                                     │
-echo  │ Letters A-Y: Options 10-34 (A=10, B=11, etc.)                            │
-echo  │ Z=35, AA=36, AB=37, AC=38, and so on                                     │
-echo  │ Type 'HELP' for more detailed instructions                               │
-echo  └─────────────────────────────────────────────────────────────────────────────┘
-echo.
-choice /c 123456789ABCDEFGHIJKLMNOPQRSTUVWX YZ AA AB AC AD AE AF AG AH AI AJ H /n /m "Choose an option (H for Help): "
-if errorlevel 46 goto :GET_HELP
-if errorlevel 45 goto :HARDWARE_DIAGNOSTICS
-if errorlevel 44 goto :NETWORK_SPEED_TEST
-if errorlevel 43 goto :SYSTEM_HEALTH_MONITOR
-if errorlevel 42 goto :SHOW_BACKUP_DRIVE_INFO
-if errorlevel 41 goto :COMPLETE_BACKUP_RESTORE
-if errorlevel 40 goto :PRIVACY_OPTIMIZATIONS
-if errorlevel 39 goto :DETAILED_LOGGING
-if errorlevel 38 goto :eof
-if errorlevel 26 goto :GAMING_SPECIFIC
-if errorlevel 25 goto :REPAIR_SYSTEM_FILES
-if errorlevel 24 goto :HARDWARE_OPTIMIZATION
-if errorlevel 23 goto :DRIVER_BACKUP
-if errorlevel 22 goto :NETWORK_OPTIMIZE
-if errorlevel 21 goto :OPTIMIZE_DNS_SETTINGS
-if errorlevel 20 goto :EXTRA_TOOLS
-if errorlevel 19 goto :GPU_OPTIMIZATION
-if errorlevel 18 goto :FUTURE_IMPROVEMENTS
-if errorlevel 17 goto :DEBLOAT_WINDOWS
-if errorlevel 16 goto :AUTO_OPTIMIZE
-if errorlevel 15 goto :DISABLE_HIBERNATION
-if errorlevel 14 goto :CLEAN_WINDOWS_OLD
-if errorlevel 13 goto :OPTIMIZE_STARTUP
-if errorlevel 12 goto :DISABLE_SEARCH_INDEXING
-if errorlevel 11 goto :DISK_CLEANUP
-if errorlevel 10 goto :GAMING_TWEAKS
-if errorlevel 9 goto :MAX_RESPONSIVENESS
-if errorlevel 8 goto :BEST_PERFORMANCE
-if errorlevel 7 goto :GPEDIT
-if errorlevel 6 goto :REGISTRY
-if errorlevel 5 goto :NETWORK_OPTIMIZE
-if errorlevel 4 goto :CLEAREVENTS
-if errorlevel 3 goto :DEFRAG
-if errorlevel 2 goto :STARTUP
-if errorlevel 1 goto :CLEANTEMP
+echo Invalid choice! Please enter a number between 1 and 39.
+pause
+goto :MAIN_MENU
 
 :: --------------------------------------
 :: OPTIMIZATION MODULES
 :: --------------------------------------
+:RUN_ALL_AUTOMATED
+    cls
+    echo.
+    echo  ========================================================
+    echo   STARTING AUTOMATED FULL SYSTEM OPTIMIZATION
+    echo  ========================================================
+    echo.
+    echo  [INFO] Setting up automation...
+    set "RETURN_TO_CALLER=1"
+    
+    echo.
+    echo  [STEP 1/10] Cleaning Temporary Files...
+    call :CLEANTEMP
+    
+    echo.
+    echo  [STEP 2/10] Optimizing Registry (All Modules)...
+    call :REGISTRY
+    
+    echo.
+    echo  [STEP 3/10] Optimizing Network...
+    call :NETWORK_OPTIMIZE
+    
+    echo.
+    echo  [STEP 4/10] Cleaning Disk Space...
+    call :DISK_CLEANUP
+    
+    echo.
+    echo  [STEP 5/10] Flushing Event Logs...
+    call :CLEAREVENTS
+    
+    echo.
+    echo  [STEP 6/10] Applying Gaming Tweaks...
+    call :GAMING_TWEAKS
+    
+    echo.
+    echo  [STEP 7/10] Optimizing Startup...
+    call :OPTIMIZE_STARTUP_BOOT
+    
+    echo.
+    echo  [STEP 8/10] Debloating Windows (Essentials Only)...
+    call :DEBLOAT_WINDOWS
+    
+    echo.
+    echo  [STEP 9/10] Optimizing DNS (Cloudflare)...
+    call :OPTIMIZE_DNS_SETTINGS
+    
+    echo.
+    echo  [STEP 10/10] Applying Auto-Optimizations...
+    call :AUTO_OPTIMIZE
+    
+    set "RETURN_TO_CALLER="
+    
+    echo.
+    echo  ========================================================
+    echo   FULL OPTIMIZATION COMPLETE!
+    echo   Your system has been fully optimized.
+    echo  ========================================================
+    echo.
+    pause
+    goto :MAIN_MENU
 
 :: 1. Clear Temporary Files and Caches
 :CLEANTEMP
@@ -428,14 +479,14 @@ if errorlevel 1 goto :CLEANTEMP
 :STARTUP
     echo.
     echo  --------------------------------------------------------
-    echo   Restarting explorer and dwm
+    echo   Restarting Windows Explorer
     echo  --------------------------------------------------------
     echo.
-    echo  Opening System Configuration...
-    TASKKILL /F /IM dwm.exe
-	start dwm.exe
-	TASKKILL /F /IM explorer.exe
-	start explorer.exe
+    echo  [INFO] Restarting explorer.exe to refresh system UI...
+    TASKKILL /F /IM explorer.exe >nul 2>&1
+    start explorer.exe
+    echo  [SUCCESS] Explorer restarted.
+    pause
     goto :MAIN_MENU
 
 :: 3. Defragment Disk (HDD only)
@@ -588,6 +639,38 @@ if errorlevel 1 goto :CLEANTEMP
     echo   27.  Disable Unnecessary Services
     echo   28.  Back to Main Menu
     echo.
+    echo   27.  Disable Unnecessary Services
+    echo   28.  Back to Main Menu
+    echo.
+    if defined RETURN_TO_CALLER (
+        echo  [AUTO] Running ALL Registry Optimizations...
+        call :DISABLE_VISUAL_EFFECTS
+        call :OPTIMIZE_MEMORY
+        call :ENABLE_PERFORMANCE_POWER
+        call :DISABLE_SUPERFETCH
+        call :DISABLE_PREFETCH
+        call :BOOST_RESPONSIVENESS
+        call :OPTIMIZE_CORE_PARKING
+        call :DISABLE_ANIMATIONS
+        call :OPTIMIZE_TCPIP
+        call :DISABLE_NAGLE
+        call :INCREASE_THROUGHPUT
+        call :OPTIMIZE_DNS_SETTINGS
+        call :DISABLE_AUTO_TUNING
+        call :OPTIMIZE_GAMING_PERF
+        call :DISABLE_GAME_DVR
+        call :OPTIMIZE_GPU_SETTINGS
+        call :DISABLE_XBOX_ACCESSORIES
+        call :DISABLE_TELEMETRY
+        call :DISABLE_ACTIVITY_HISTORY
+        call :OPTIMIZE_PRIVACY_SETTINGS
+        call :DISABLE_TIPS_SUGGESTIONS
+        call :OPTIMIZE_WINDOWS_SEARCH
+        call :DISABLE_ERROR_REPORTING
+        call :OPTIMIZE_STARTUP_BOOT
+        call :DISABLE_UNNECESSARY_SERVICES
+        goto :eof
+    )
     choice /c 123456789ABCDEFGHIJKLMN /n /m "Enter your choice (A=10, B=11, C=12, D=13, E=14, F=15, G=16, H=17, I=18, J=19, K=20, L=21, M=22, N=23): "
 
     if errorlevel 28 goto :MAIN_MENU
@@ -737,11 +820,16 @@ if errorlevel 1 goto :CLEANTEMP
     reg add "HKLM\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters" /v "MTU" /t REG_DWORD /d 1500 /f >nul 2>&1
     reg add "HKLM\SOFTWARE\Microsoft\MSMQ\Parameters" /v "TCPNoDelay" /t REG_DWORD /d 1 /f >nul 2>&1
     echo  - Network throughput increased for better internet speeds.
+    if defined RETURN_TO_CALLER goto :eof
     pause
     goto :REGISTRY
 
 :OPTIMIZE_DNS_SETTINGS
     echo.
+    if defined RETURN_TO_CALLER (
+        echo  [AUTO] Optimizing DNS...
+        rem Automating DNS optimization here if needed, typically this just calls reg adds
+    )
     echo  Optimizing DNS Settings...
     reg add "HKLM\SYSTEM\CurrentControlSet\Services\Dnscache\Parameters" /v "MaxCacheTtl" /t REG_DWORD /d 86400 /f >nul 2>&1
     reg add "HKLM\SYSTEM\CurrentControlSet\Services\Dnscache\Parameters" /v "MaxNegativeCacheTtl" /t REG_DWORD /d 0 /f >nul 2>&1
@@ -902,6 +990,7 @@ if errorlevel 1 goto :CLEANTEMP
     reg add "HKLM\SOFTWARE\Microsoft\Dfrg\BootOptimizeFunction" /v "Enable" /t REG_SZ /d "Y" /f >nul 2>&1
     reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\OptimalLayout" /v "EnableAutoLayout" /t REG_DWORD /d 1 /f >nul 2>&1
     echo  - Startup and boot performance optimized.
+    if defined RETURN_TO_CALLER goto :eof
     pause
     goto :REGISTRY
 
@@ -1192,6 +1281,10 @@ if errorlevel 1 goto :CLEANTEMP
     echo    1. Yes, I understand the risks
     echo    2. No, take me back
     echo.
+    if defined RETURN_TO_CALLER (
+        echo  [AUTO] Max Responsiveness is risky. Skipping in full automation.
+        goto :eof
+    )
     choice /c 12 /n /m "Enter your choice: "
     if errorlevel 2 goto :MAIN_MENU
 
@@ -1248,6 +1341,7 @@ if errorlevel 1 goto :CLEANTEMP
     echo  - Registry key HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Direct3D\MaxPreRenderedFrames set to 1.
 
     echo  - Gaming tweaks applied!
+    if defined RETURN_TO_CALLER goto :eof
     pause
     goto :MAIN_MENU
 
@@ -1344,6 +1438,13 @@ if errorlevel 1 goto :CLEANTEMP
     echo    3. Remove ALL Apps (Complete cleanup)
     echo    4. Back to Main Menu
     echo.
+    echo    3. Remove ALL Apps (Complete cleanup)
+    echo    4. Back to Main Menu
+    echo.
+    if defined RETURN_TO_CALLER (
+        echo  [AUTO] Removing Essentials Only...
+        goto :DEBLOAT_ESSENTIALS
+    )
     choice /c 1234 /n /m "Enter your choice: "
     if errorlevel 4 goto :MAIN_MENU
     if errorlevel 3 goto :DEBLOAT_ALL
@@ -1384,6 +1485,7 @@ if errorlevel 1 goto :CLEANTEMP
     echo   Essentials-only debloat completed!
     echo   Only core system components remain.
     echo  --------------------------------------------------------
+    if defined RETURN_TO_CALLER goto :eof
     pause
     goto :MAIN_MENU
 
@@ -2507,6 +2609,7 @@ if errorlevel 1 goto :CLEANTEMP
     echo   Advanced Performance Tweaks (2026) applied successfully!
     echo   Your system now has cutting-edge optimizations for maximum performance.
     echo  --------------------------------------------------------
+    if defined RETURN_TO_CALLER goto :eof
     pause
     goto :MAIN_MENU
 
