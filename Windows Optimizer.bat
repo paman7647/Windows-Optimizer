@@ -255,11 +255,11 @@ if errorlevel 40 goto :PRIVACY_OPTIMIZATIONS
 if errorlevel 39 goto :DETAILED_LOGGING
 if errorlevel 38 goto :eof
 if errorlevel 26 goto :GAMING_SPECIFIC
-if errorlevel 25 goto :NETWORK_ENHANCEMENTS
-if errorlevel 24 goto :DRIVER_HARDWARE_OPT
-if errorlevel 23 goto :SYSTEM_BACKUP_RESTORE
-if errorlevel 22 goto :MAINTENANCE_CLEANUP
-if errorlevel 21 goto :ONE_CLICK_OPTIONS
+if errorlevel 25 goto :REPAIR_SYSTEM_FILES
+if errorlevel 24 goto :HARDWARE_OPTIMIZATION
+if errorlevel 23 goto :DRIVER_BACKUP
+if errorlevel 22 goto :NETWORK_OPTIMIZE
+if errorlevel 21 goto :OPTIMIZE_DNS_SETTINGS
 if errorlevel 20 goto :EXTRA_TOOLS
 if errorlevel 19 goto :GPU_OPTIMIZATION
 if errorlevel 18 goto :FUTURE_IMPROVEMENTS
@@ -2507,6 +2507,68 @@ if errorlevel 1 goto :CLEANTEMP
     echo   Advanced Performance Tweaks (2026) applied successfully!
     echo   Your system now has cutting-edge optimizations for maximum performance.
     echo  --------------------------------------------------------
+    pause
+    goto :MAIN_MENU
+
+:: --------------------------------------
+:: 23. DRIVER BACKUP
+:: --------------------------------------
+:DRIVER_BACKUP
+    cls
+    echo.
+    echo  --------------------------------------------------------
+    echo   Backing up Third-Party Drivers...
+    echo  --------------------------------------------------------
+    echo.
+    echo  [INFO] Exporting drivers to %BackupDir%\Drivers...
+    if not exist "%BackupDir%\Drivers" md "%BackupDir%\Drivers"
+    dism /online /export-driver /destination:"%BackupDir%\Drivers"
+    echo.
+    echo  [SUCCESS] Drivers backed up successfully.
+    echo.
+    pause
+    goto :MAIN_MENU
+
+:: --------------------------------------
+:: 24. HARDWARE OPTIMIZATION
+:: --------------------------------------
+:HARDWARE_OPTIMIZATION
+    cls
+    echo.
+    echo  --------------------------------------------------------
+    echo   Optimizing Hardware Settings...
+    echo  --------------------------------------------------------
+    echo.
+    echo  [INFO] Applying High Performance Power Plan...
+    powercfg /s 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c
+    echo.
+    echo  [INFO] Disabling USB Selective Suspend...
+    powercfg /SETACVALUEINDEX SCHEME_CURRENT 2a737441-1930-4402-8d77-b94b2830b971 48e6b7a6-50f5-4782-a5d4-53bb8f07e226 0
+    powercfg /SETDCVALUEINDEX SCHEME_CURRENT 2a737441-1930-4402-8d77-b94b2830b971 48e6b7a6-50f5-4782-a5d4-53bb8f07e226 0
+    echo.
+    echo  [SUCCESS] Hardware settings optimized.
+    echo.
+    pause
+    goto :MAIN_MENU
+
+:: --------------------------------------
+:: 25. REPAIR SYSTEM FILES
+:: --------------------------------------
+:REPAIR_SYSTEM_FILES
+    cls
+    echo.
+    echo  --------------------------------------------------------
+    echo   Repairing System Files...
+    echo  --------------------------------------------------------
+    echo.
+    echo  [INFO] Running System File Checker (SFC)...
+    sfc /scannow
+    echo.
+    echo  [INFO] Running DISM Cleanup and RestoreHealth...
+    dism /online /cleanup-image /restorehealth
+    echo.
+    echo  [SUCCESS] System repairs completed.
+    echo.
     pause
     goto :MAIN_MENU
 
