@@ -1,318 +1,126 @@
 #requires -Version 5.1
 
-<#
-.SYNOPSIS
-    Unattended WSL 2 + Ubuntu LTS installer.
-
-.DESCRIPTION
-    Run directly:
-
-        irm https://raw.githubusercontent.com/paman7647/Windows-Tools/main/linux.ps1 | iex
-
-    Features:
-      - No command-line arguments
-      - Automatic Administrator elevation
-      - Works from IEX / GitHub
-      - Reliable reboot/resume
-      - Enables WSL
-      - Enables Virtual Machine Platform
-      - Handles DISM 3010 / 1641 correctly
-      - Enables hypervisor launch if disabled
-      - Updates WSL
-      - Installs latest stable Ubuntu LTS
-      - ARM64 and AMD64 support
-      - SHA256 verifies direct Ubuntu image fallback
-      - Uses Ubuntu cloud-init
-      - Creates requested Linux user
-      - Sets requested password
-      - Configures sudo
-      - Sets Linux user as default
-      - Forces WSL 2
-      - Idempotent
-      - Preserves existing Ubuntu installation
-      - Cleans temporary state after success
-#>
-
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 
 # ================================================================
-# CONFIGURATION
+# CONFIG
 # ================================================================
 
-$SelfUrl =
-    'https://raw.githubusercontent.com/paman7647/Windows-Tools/main/linux.ps1'
+$SelfUrl        = 'https://raw.githubusercontent.com/paman7647/Windows-Tools/main/linux.ps1'
+$DistroName     = 'Ubuntu-26.04'
+$StateRoot      = Join-Path $env:ProgramData 'WSL2-Ubuntu-Installer'
+$ScriptCopy     = Join-Path $StateRoot 'linux.ps1'
+$StateFile      = Join-Path $StateRoot 'state.json'
+$PasswordFile   = Join-Path $StateRoot 'password.dat'
+$ResumeTaskName = 'WSL2-Ubuntu-Installer-Resume'
+$CloudInitDir   = Join-Path $env:USERPROFILE '.cloud-init'
+$CloudInitFile  = Join-Path $CloudInitDir "$DistroName.user-data"
 
-$DistroName = 'Ubuntu'
-
-$StateRoot = Join-Path `
-    $env:ProgramData `
-    'WSL2-Ubuntu-Installer'
-
-$StateFile = Join-Path `
-    $StateRoot `
-    'state.json'
-
-$PasswordFile = Join-Path `
-    $StateRoot `
-    'password.dat'
-
-$InstallerFile = Join-Path `
-    $StateRoot `
-    'linux.ps1'
-
-$ResumeTaskName =
-    'WSL2-Ubuntu-Installer-Resume'
-
-$CloudInitDirectory = Join-Path `
-    $env:USERPROFILE `
-    '.cloud-init'
-
-$CloudInitFile = Join-Path `
-    $CloudInitDirectory `
-    "$DistroName.user-data"
-
-$script:RebootRequired = $false
-
+$script:RebootRequired      = $false
+$script:LinuxUsername       = $null
+$script:LinuxPassword       = $null
+$script:InstallerScriptPath = $null
 
 # ================================================================
 # OUTPUT
 # ================================================================
 
 function Write-Step {
-    param(
-        [string]$Message
-    )
-
+    param([string]$Message)
     Write-Host ''
     Write-Host "==> $Message" -ForegroundColor Cyan
 }
 
 function Write-OK {
-    param(
-        [string]$Message
-    )
-
+    param([string]$Message)
     Write-Host "[OK] $Message" -ForegroundColor Green
 }
 
 function Write-Warn {
-    param(
-        [string]$Message
-    )
-
+    param([string]$Message)
     Write-Host "[WARN] $Message" -ForegroundColor Yellow
 }
 
 function Write-Fail {
-    param(
-        [string]$Message
-    )
-
+    param([string]$Message)
     Write-Host "[ERROR] $Message" -ForegroundColor Red
 }
 
-
 # ================================================================
-# ADMIN CHECK
+# BASICS
 # ================================================================
 
 function Test-Administrator {
-
-    $identity =
-        [Security.Principal.WindowsIdentity]::GetCurrent()
-
-    $principal =
-        New-Object Security.Principal.WindowsPrincipal($identity)
-
-    return $principal.IsInRole(
-        [Security.Principal.WindowsBuiltInRole]::Administrator
-    )
+    $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+    $principal = New-Object Security.Principal.WindowsPrincipal($identity)
+    return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 }
 
-
-function Get-PowerShellExecutable {
-
-    $pwsh =
-        Get-Command `
-            pwsh.exe `
-            -ErrorAction SilentlyContinue
-
+function Get-PowerShellExe {
+    $pwsh = Get-Command pwsh.exe -ErrorAction SilentlyContinue
     if ($pwsh) {
         return $pwsh.Source
     }
 
-    return (
-        Get-Command `
-            powershell.exe `
-            -ErrorAction Stop
-    ).Source
+    return (Get-Command powershell.exe -ErrorAction Stop).Source
 }
 
+function Ensure-StateRoot {
+    if (-not (Test-Path $StateRoot)) {
+        New-Item -ItemType Directory -Path $StateRoot -Force | Out-Null
+    }
+}
 
-# ================================================================
-# ENSURE REAL SCRIPT FILE
-#
-# Critical for:
-#     irm URL | iex
-#
-# IEX does not provide $PSCommandPath.
-# ================================================================
+function Write-Utf8NoBom {
+    param(
+        [Parameter(Mandatory)] [string]$Path,
+        [Parameter(Mandatory)] [string]$Content
+    )
+    $enc = New-Object System.Text.UTF8Encoding $false
+    [System.IO.File]::WriteAllText($Path, $Content, $enc)
+}
 
-function Ensure-RealScriptFile {
-
-    if (
-        -not [string]::IsNullOrWhiteSpace($PSCommandPath) -and
-        (Test-Path $PSCommandPath)
-    ) {
-
+function Get-InstallerScriptPath {
+    if (-not [string]::IsNullOrWhiteSpace($PSCommandPath) -and (Test-Path $PSCommandPath)) {
         return $PSCommandPath
     }
 
-    if (-not (Test-Path $StateRoot)) {
-
-        New-Item `
-            -ItemType Directory `
-            -Path $StateRoot `
-            -Force |
-            Out-Null
-    }
-
-    if (-not (Test-Path $InstallerFile)) {
-
-        Write-Host ''
-        Write-Host `
-            'Preparing installer...' `
-            -ForegroundColor Cyan
-
-        Invoke-WebRequest `
-            -Uri $SelfUrl `
-            -OutFile $InstallerFile `
-            -UseBasicParsing
-    }
-
-    return $InstallerFile
-}
-
-
-# ================================================================
-# AUTOMATIC ELEVATION
-# ================================================================
-
-if (-not (Test-Administrator)) {
-
+    Ensure-StateRoot
     Write-Host ''
-    Write-Host `
-        'Administrator privileges are required.' `
-        -ForegroundColor Yellow
+    Write-Host 'Preparing installer...' -ForegroundColor Cyan
 
-    Write-Host `
-        'Requesting Administrator elevation...' `
-        -ForegroundColor Cyan
-
-    Write-Host ''
-
-    try {
-
-        $SourceFile = Ensure-RealScriptFile
-
-        $PowerShell = Get-PowerShellExecutable
-
-        $Arguments =
-            "-NoProfile -ExecutionPolicy Bypass -File `"$SourceFile`""
-
-        $process = Start-Process `
-            -FilePath $PowerShell `
-            -ArgumentList $Arguments `
-            -Verb RunAs `
-            -Wait `
-            -PassThru
-
-        exit $process.ExitCode
-    }
-    catch {
-
-        Write-Fail `
-            "Administrator elevation failed: $($_.Exception.Message)"
-
-        exit 1
-    }
+    Invoke-WebRequest -Uri $SelfUrl -OutFile $ScriptCopy -UseBasicParsing
+    return $ScriptCopy
 }
 
+function Invoke-SelfRelaunch {
+    param(
+        [Parameter(Mandatory)] [string]$ScriptPath,
+        [switch]$RunAs
+    )
 
-# ================================================================
-# WE ARE NOW ELEVATED
-#
-# If originally started using IEX, make sure the elevated
-# process itself is file-backed.
-# ================================================================
+    $pwsh = Get-PowerShellExe
+    $argLine = "-NoProfile -ExecutionPolicy Bypass -File `"$ScriptPath`""
 
-try {
-
-    if (
-        [string]::IsNullOrWhiteSpace($PSCommandPath) -or
-        -not (Test-Path $PSCommandPath)
-    ) {
-
-        if (-not (Test-Path $StateRoot)) {
-
-            New-Item `
-                -ItemType Directory `
-                -Path $StateRoot `
-                -Force |
-                Out-Null
-        }
-
-        Invoke-WebRequest `
-            -Uri $SelfUrl `
-            -OutFile $InstallerFile `
-            -UseBasicParsing
-
-        $PowerShell = Get-PowerShellExecutable
-
-        $process = Start-Process `
-            -FilePath $PowerShell `
-            -ArgumentList `
-            "-NoProfile -ExecutionPolicy Bypass -File `"$InstallerFile`"" `
-            -Wait `
-            -PassThru
-
-        exit $process.ExitCode
+    if ($RunAs) {
+        $proc = Start-Process -FilePath $pwsh -ArgumentList $argLine -Verb RunAs -Wait -PassThru
     }
+    else {
+        $proc = Start-Process -FilePath $pwsh -ArgumentList $argLine -Wait -PassThru
+    }
+
+    exit $proc.ExitCode
 }
-catch {
-
-    Write-Fail `
-        "Unable to prepare persistent installer: $($_.Exception.Message)"
-
-    exit 1
-}
-
 
 # ================================================================
 # STATE
 # ================================================================
 
-function Ensure-StateDirectory {
-
-    if (-not (Test-Path $StateRoot)) {
-
-        New-Item `
-            -ItemType Directory `
-            -Path $StateRoot `
-            -Force |
-            Out-Null
-    }
-}
-
-
 function Save-State {
+    param([Parameter(Mandatory)] [string]$Username)
 
-    param(
-        [string]$Username
-    )
-
-    Ensure-StateDirectory
+    Ensure-StateRoot
 
     @{
         Username = $Username
@@ -320,207 +128,119 @@ function Save-State {
         Created  = (Get-Date).ToString('o')
     } |
         ConvertTo-Json |
-        Set-Content `
-            -Path $StateFile `
-            -Encoding UTF8
+        Set-Content -Path $StateFile -Encoding UTF8
 }
 
-
 function Get-State {
-
     if (-not (Test-Path $StateFile)) {
         return $null
     }
 
     try {
-
-        return (
-            Get-Content `
-                -Path $StateFile `
-                -Raw |
-            ConvertFrom-Json
-        )
+        return Get-Content -Path $StateFile -Raw | ConvertFrom-Json
     }
     catch {
-
         return $null
     }
 }
 
-
 function Save-Password {
+    param([Parameter(Mandatory)] [Security.SecureString]$Password)
 
-    param(
-        [Security.SecureString]$Password
-    )
-
-    Ensure-StateDirectory
-
-    # DPAPI-protected for the current Windows user.
-    $encrypted =
-        ConvertFrom-SecureString $Password
-
-    Set-Content `
-        -Path $PasswordFile `
-        -Value $encrypted `
-        -Encoding UTF8
+    Ensure-StateRoot
+    (ConvertFrom-SecureString $Password) | Set-Content -Path $PasswordFile -Encoding UTF8
 }
 
-
 function Get-SavedPassword {
-
     if (-not (Test-Path $PasswordFile)) {
         return $null
     }
 
     try {
-
-        $encrypted =
-            Get-Content `
-                -Path $PasswordFile `
-                -Raw
-
+        $encrypted = Get-Content -Path $PasswordFile -Raw
         return ConvertTo-SecureString $encrypted
     }
     catch {
-
         return $null
     }
 }
 
-
-# ================================================================
-# SCHEDULED REBOOT RESUME
-# ================================================================
-
-function Remove-ResumeTask {
-
+function Remove-StateFiles {
+    Remove-Item $StateFile, $PasswordFile, $ScriptCopy -Force -ErrorAction SilentlyContinue
     try {
-
-        Unregister-ScheduledTask `
-            -TaskName $ResumeTaskName `
-            -Confirm:$false `
-            -ErrorAction SilentlyContinue
+        if (Test-Path $StateRoot) {
+            $children = @(Get-ChildItem -Path $StateRoot -Force -ErrorAction SilentlyContinue)
+            if ($children.Count -eq 0) {
+                Remove-Item $StateRoot -Force -ErrorAction SilentlyContinue
+            }
+        }
     }
     catch {
     }
 }
 
+# ================================================================
+# RESUME TASK
+# ================================================================
+
+function Remove-ResumeTask {
+    try {
+        Unregister-ScheduledTask -TaskName $ResumeTaskName -Confirm:$false -ErrorAction SilentlyContinue
+    }
+    catch {
+    }
+}
 
 function Register-ResumeTask {
+    Ensure-StateRoot
 
-    Ensure-StateDirectory
+    if ($script:InstallerScriptPath -and ($script:InstallerScriptPath -ne $ScriptCopy)) {
+        Copy-Item -Path $script:InstallerScriptPath -Destination $ScriptCopy -Force
+    }
 
-    # The script is guaranteed to be file-backed now.
-    Copy-Item `
-        -Path $PSCommandPath `
-        -Destination $InstallerFile `
-        -Force
+    $pwsh = Get-PowerShellExe
+    $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
 
-    $PowerShell =
-        Get-PowerShellExecutable
+    $action = New-ScheduledTaskAction -Execute $pwsh -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$ScriptCopy`""
+    $trigger = New-ScheduledTaskTrigger -AtLogOn
+    $principal = New-ScheduledTaskPrincipal -UserId $identity.Name -LogonType Interactive -RunLevel Highest
+    $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -ExecutionTimeLimit (New-TimeSpan -Hours 2)
 
-    $identity =
-        [Security.Principal.WindowsIdentity]::GetCurrent()
-
-    $action =
-        New-ScheduledTaskAction `
-            -Execute $PowerShell `
-            -Argument `
-            "-NoProfile -ExecutionPolicy Bypass -File `"$InstallerFile`""
-
-    $trigger =
-        New-ScheduledTaskTrigger `
-            -AtLogOn
-
-    $principal =
-        New-ScheduledTaskPrincipal `
-            -UserId $identity.Name `
-            -LogonType Interactive `
-            -RunLevel Highest
-
-    $settings =
-        New-ScheduledTaskSettingsSet `
-            -StartWhenAvailable `
-            -ExecutionTimeLimit (
-                New-TimeSpan -Hours 2
-            )
-
-    Register-ScheduledTask `
-        -TaskName $ResumeTaskName `
-        -Action $action `
-        -Trigger $trigger `
-        -Principal $principal `
-        -Settings $settings `
-        -Force |
-        Out-Null
-
-    Write-OK `
-        'Automatic reboot-resume task registered.'
+    Register-ScheduledTask -TaskName $ResumeTaskName -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force | Out-Null
+    Write-OK 'Automatic reboot-resume task registered.'
 }
-
 
 function Restart-AndResume {
-
+    Save-State -Username $script:LinuxUsername
+    Save-Password -Password $script:LinuxPassword
     Register-ResumeTask
 
-    Save-State `
-        -Username $script:LinuxUsername
-
-    Save-Password `
-        -Password $script:LinuxPassword
-
     Write-Host ''
-    Write-Warn `
-        'Windows restart is required.'
-
-    Write-Host `
-        'The installer will automatically continue after you sign in.' `
-        -ForegroundColor Yellow
-
+    Write-Warn 'Windows restart is required.'
+    Write-Host 'The installer will automatically continue after you sign in.' -ForegroundColor Yellow
     Write-Host ''
-    Write-Host `
-        'Restarting Windows in 5 seconds...' `
-        -ForegroundColor Yellow
+    Write-Host 'Restarting Windows in 5 seconds...' -ForegroundColor Yellow
 
     Start-Sleep -Seconds 5
-
     Restart-Computer -Force
-
     exit 0
 }
-
 
 # ================================================================
 # REBOOT DETECTION
 # ================================================================
 
 function Test-WindowsRebootRequired {
-
-    if (
-        Test-Path `
-            'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending'
-    ) {
-
+    if (Test-Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending') {
         return $true
     }
 
-    if (
-        Test-Path `
-            'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired'
-    ) {
-
+    if (Test-Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired') {
         return $true
     }
 
     try {
-
-        $pending =
-            Get-ItemProperty `
-                'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager' `
-                -Name PendingFileRenameOperations `
-                -ErrorAction SilentlyContinue
-
+        $pending = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager' -Name PendingFileRenameOperations -ErrorAction SilentlyContinue
         if ($null -ne $pending.PendingFileRenameOperations) {
             return $true
         }
@@ -531,231 +251,111 @@ function Test-WindowsRebootRequired {
     return $false
 }
 
-
 # ================================================================
-# WINDOWS FEATURE ENABLEMENT
+# FEATURES / HYPERVISOR
 # ================================================================
 
 function Enable-WindowsFeatureSafe {
+    param([Parameter(Mandatory)] [string]$FeatureName)
 
-    param(
-        [Parameter(Mandatory)]
-        [string]$FeatureName
-    )
-
-    Write-Step `
-        "Enabling $FeatureName"
-
-    # ------------------------------------------------------------
-    # Preferred Microsoft PowerShell API.
-    #
-    # It exposes RestartNeeded directly.
-    # ------------------------------------------------------------
+    Write-Step "Enabling $FeatureName"
 
     try {
-
-        $result =
-            Enable-WindowsOptionalFeature `
-                -Online `
-                -FeatureName $FeatureName `
-                -All `
-                -NoRestart `
-                -ErrorAction Stop
-
+        $result = Enable-WindowsOptionalFeature -Online -FeatureName $FeatureName -All -NoRestart -ErrorAction Stop
         if ($result.RestartNeeded) {
-
             $script:RebootRequired = $true
-
-            Write-OK `
-                "$FeatureName enabled. Restart required."
+            Write-OK "$FeatureName enabled. Restart required."
         }
         else {
-
-            Write-OK `
-                "$FeatureName enabled."
+            Write-OK "$FeatureName enabled."
         }
-
         return
     }
     catch {
-
-        Write-Warn `
-            'PowerShell feature API failed; using DISM fallback.'
+        Write-Warn 'PowerShell feature API failed; using DISM fallback.'
     }
 
-    # ------------------------------------------------------------
-    # DISM fallback.
-    #
-    # 0    = success
-    # 3010 = success + reboot required
-    # 1641 = success + restart initiated/required
-    # ------------------------------------------------------------
-
-    & dism.exe `
-        /online `
-        /enable-feature `
-        "/featurename:$FeatureName" `
-        /all `
-        /norestart
-
+    & dism.exe /online /enable-feature "/featurename:$FeatureName" /all /norestart
     $code = $LASTEXITCODE
 
     if ($code -notin @(0, 3010, 1641)) {
-
-        throw `
-            "Failed to enable $FeatureName. DISM exit code: $code"
+        throw "Failed to enable $FeatureName. DISM exit code: $code"
     }
 
     if ($code -in @(3010, 1641)) {
-
         $script:RebootRequired = $true
-
-        Write-OK `
-            "$FeatureName enabled. Restart required."
+        Write-OK "$FeatureName enabled. Restart required."
     }
     else {
-
-        Write-OK `
-            "$FeatureName enabled."
+        Write-OK "$FeatureName enabled."
     }
 }
 
-
-# ================================================================
-# HYPERVISOR BOOT CONFIGURATION
-# ================================================================
-
 function Ensure-HypervisorLaunch {
+    Write-Step 'Checking Windows hypervisor configuration'
 
-    Write-Step `
-        'Checking Windows hypervisor configuration'
-
-    $output =
-        & bcdedit.exe `
-            /enum `
-            '{current}' `
-            2>$null
-
-    $line =
-        $output |
-        Where-Object {
-            $_ -match 'hypervisorlaunchtype'
-        } |
-        Select-Object -First 1
+    $output = & bcdedit.exe /enum '{current}' 2>$null
+    $line = $output | Where-Object { $_ -match 'hypervisorlaunchtype' } | Select-Object -First 1
 
     if ($line -match 'Off') {
-
-        Write-Warn `
-            'Hypervisor launch is disabled.'
-
-        & bcdedit.exe `
-            /set `
-            hypervisorlaunchtype `
-            Auto
-
+        Write-Warn 'Hypervisor launch is disabled.'
+        & bcdedit.exe /set hypervisorlaunchtype auto
         if ($LASTEXITCODE -ne 0) {
-
-            throw `
-                'Unable to enable hypervisor launch.'
+            throw 'Unable to enable hypervisor launch.'
         }
 
         $script:RebootRequired = $true
-
-        Write-OK `
-            'Hypervisor launch enabled. Restart required.'
+        Write-OK 'Hypervisor launch enabled. Restart required.'
     }
     else {
-
-        Write-OK `
-            'Hypervisor launch configuration is ready.'
+        Write-OK 'Hypervisor launch configuration is ready.'
     }
 }
 
-
 # ================================================================
-# WSL DISTRIBUTIONS
+# WSL / UBUNTU
 # ================================================================
 
 function Get-WSLDistros {
-
     try {
-
-        $result =
-            & wsl.exe `
-                --list `
-                --quiet `
-                2>$null
-
+        $result = & wsl.exe --list --quiet 2>$null
         if ($LASTEXITCODE -ne 0) {
             return @()
         }
 
         return @(
             $result |
-            ForEach-Object {
-                $_.ToString().
-                    Trim().
-                    TrimStart([char]0xFEFF)
-            } |
-            Where-Object {
-                $_ -and
-                $_ -notmatch 'Windows Subsystem' -and
-                $_ -notmatch 'No installed distributions'
-            }
+            ForEach-Object { $_.ToString().Trim().TrimStart([char]0xFEFF) } |
+            Where-Object { $_ -and $_ -notmatch 'Windows Subsystem' -and $_ -notmatch 'No installed distributions' }
         )
     }
     catch {
-
         return @()
     }
 }
 
-
 function Test-WSLDistro {
+    param([Parameter(Mandatory)] [string]$Name)
 
-    param(
-        [string]$Name
-    )
-
-    foreach (
-        $distro in (
-            Get-WSLDistros
-        )
-    ) {
-
+    foreach ($distro in (Get-WSLDistros)) {
         if ($distro -ieq $Name) {
             return $true
         }
     }
-
     return $false
 }
 
-
 function Get-WSLDistroVersion {
-
-    param(
-        [string]$Name
-    )
+    param([Parameter(Mandatory)] [string]$Name)
 
     try {
-
-        $output =
-            & wsl.exe `
-                --list `
-                --verbose `
-                2>$null
+        $output = & wsl.exe --list --verbose 2>$null
+        $escaped = [regex]::Escape($Name)
+        $pattern = "^\s*\*?\s*$escaped\s+\S+\s+([12])\s*$"
 
         foreach ($line in $output) {
-
-            $text =
-                $line.ToString()
-
-            if (
-                $text -match [regex]::Escape($Name) -and
-                $text -match '\s([12])\s*$'
-            ) {
-
+            $text = $line.ToString()
+            if ($text -match $pattern) {
                 return [int]$Matches[1]
             }
         }
@@ -766,22 +366,22 @@ function Get-WSLDistroVersion {
     return $null
 }
 
+function Convert-SecureStringToPlainText {
+    param([Parameter(Mandatory)] [Security.SecureString]$SecureString)
 
-# ================================================================
-# LINUX USER VALIDATION
-# ================================================================
+    $ptr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($SecureString)
+    try {
+        return [Runtime.InteropServices.Marshal]::PtrToStringBSTR($ptr)
+    }
+    finally {
+        [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptr)
+    }
+}
 
 function Test-LinuxUsername {
+    param([Parameter(Mandatory)] [string]$Username)
 
-    param(
-        [string]$Username
-    )
-
-    if (
-        $Username -notmatch `
-            '^[a-z_][a-z0-9_-]{0,31}$'
-    ) {
-
+    if ($Username -notmatch '^[a-z_][a-z0-9_-]{0,31}$') {
         return $false
     }
 
@@ -792,56 +392,17 @@ function Test-LinuxUsername {
     return $true
 }
 
+function Escape-BashSingleQuote {
+    param([Parameter(Mandatory)] [string]$Value)
 
-# ================================================================
-# SECURE STRING
-# ================================================================
-
-function Convert-SecureStringToPlain {
-
-    param(
-        [Security.SecureString]$SecureString
-    )
-
-    $ptr =
-        [Runtime.InteropServices.Marshal]::SecureStringToBSTR(
-            $SecureString
-        )
-
-    try {
-
-        return (
-            [Runtime.InteropServices.Marshal]::PtrToStringBSTR(
-                $ptr
-            )
-        )
-    }
-    finally {
-
-        [Runtime.InteropServices.Marshal]::ZeroFreeBSTR(
-            $ptr
-        )
-    }
+    return $Value.Replace("'", "'\''")
 }
 
-
-# ================================================================
-# CLOUD-INIT
-# ================================================================
-
 function New-CloudInit {
+    param([Parameter(Mandatory)] [string]$Username)
 
-    param(
-        [string]$Username
-    )
-
-    if (-not (Test-Path $CloudInitDirectory)) {
-
-        New-Item `
-            -ItemType Directory `
-            -Path $CloudInitDirectory `
-            -Force |
-            Out-Null
+    if (-not (Test-Path $CloudInitDir)) {
+        New-Item -ItemType Directory -Path $CloudInitDir -Force | Out-Null
     }
 
     $config = @"
@@ -876,270 +437,170 @@ write_files:
       enabled=true
       mountFsTab=false
 
-runcmd:
-  - mkdir -p /home/$Username
-  - chown -R $Username`:$Username /home/$Username
-  - touch /home/$Username/.hushlogin
-
-final_message: "WSL Ubuntu provisioning completed."
+final_message: "Ubuntu WSL cloud-init completed."
 "@
 
-    Set-Content `
-        -Path $CloudInitFile `
-        -Value $config `
-        -Encoding UTF8
-
-    Write-OK `
-        'Ubuntu cloud-init configuration created.'
+    Write-Utf8NoBom -Path $CloudInitFile -Content $config
 }
-
 
 function Remove-CloudInit {
-
     if (Test-Path $CloudInitFile) {
+        Remove-Item $CloudInitFile -Force -ErrorAction SilentlyContinue
+    }
 
-        Remove-Item `
-            $CloudInitFile `
-            -Force `
-            -ErrorAction SilentlyContinue
+    try {
+        if (Test-Path $CloudInitDir) {
+            $children = @(Get-ChildItem -Path $CloudInitDir -Force -ErrorAction SilentlyContinue)
+            if ($children.Count -eq 0) {
+                Remove-Item $CloudInitDir -Force -ErrorAction SilentlyContinue
+            }
+        }
+    }
+    catch {
     }
 }
 
+function Update-WSLRuntime {
+    Write-Step 'Updating WSL runtime'
 
-# ================================================================
-# WSL UPDATE
-# ================================================================
-
-function Update-WSL {
-
-    Write-Step `
-        'Updating WSL'
-
-    # Current Microsoft-supported path.
     try {
-
-        & wsl.exe `
-            --update `
-            --web-download
-
+        & wsl.exe --update --web-download
         if ($LASTEXITCODE -eq 0) {
-
-            Write-OK `
-                'WSL updated successfully.'
-
+            Write-OK 'WSL runtime updated.'
             return
         }
     }
     catch {
     }
 
-    Write-Warn `
-        'wsl --update --web-download did not complete.'
-
-    # Try normal WSL update.
     try {
-
-        & wsl.exe `
-            --update
-
+        & wsl.exe --update
         if ($LASTEXITCODE -eq 0) {
-
-            Write-OK `
-                'WSL updated successfully.'
-
+            Write-OK 'WSL runtime updated.'
             return
         }
     }
     catch {
     }
 
-    # ------------------------------------------------------------
-    # Official Microsoft WSL release fallback.
-    # ------------------------------------------------------------
+    Write-Warn 'WSL update did not complete through wsl.exe; trying Microsoft release package.'
 
-    Write-Warn `
-        'Downloading the latest stable Microsoft WSL package.'
+    $apiUrl = 'https://api.github.com/repos/microsoft/WSL/releases/latest'
+    $release = Invoke-RestMethod -Uri $apiUrl -Headers @{ 'User-Agent' = 'WSL2-Ubuntu-Installer' } -UseBasicParsing
 
-    $api =
-        'https://api.github.com/repos/microsoft/WSL/releases/latest'
-
-    $release =
-        Invoke-RestMethod `
-            -Uri $api `
-            -Headers @{
-                'User-Agent' = 'WSL2-Ubuntu-Installer'
-            } `
-            -UseBasicParsing
-
-    $architecture =
-        $env:PROCESSOR_ARCHITECTURE.ToUpperInvariant()
-
-    if ($architecture -eq 'ARM64') {
-
-        $assetPattern =
-            '\.arm64\.msi$'
+    $arch = $env:PROCESSOR_ARCHITECTURE.ToUpperInvariant()
+    if ($arch -eq 'ARM64') {
+        $pattern = '\.arm64\.msi$'
     }
-    elseif ($architecture -eq 'AMD64') {
-
-        $assetPattern =
-            '\.x64\.msi$'
+    elseif ($arch -eq 'AMD64') {
+        $pattern = '\.x64\.msi$'
     }
     else {
-
-        throw `
-            "Unsupported Windows architecture: $architecture"
+        throw "Unsupported architecture: $arch"
     }
 
-    $asset =
-        $release.assets |
-        Where-Object {
-            $_.name -match $assetPattern
-        } |
-        Select-Object -First 1
-
-    if ($null -eq $asset) {
-
-        throw `
-            "No WSL MSI for architecture $architecture was found."
+    $asset = $release.assets | Where-Object { $_.name -match $pattern } | Select-Object -First 1
+    if (-not $asset) {
+        throw "No matching WSL MSI asset found for architecture $arch."
     }
 
-    $msi =
-        Join-Path `
-            $env:TEMP `
-            $asset.name
+    $msiPath = Join-Path $env:TEMP $asset.name
+    Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $msiPath -UseBasicParsing
 
-    Write-Host ''
-    Write-Host `
-        "    Microsoft WSL release: $($release.tag_name)"
-
-    Write-Host `
-        "    Package: $($asset.name)"
-
-    Invoke-WebRequest `
-        -Uri $asset.browser_download_url `
-        -OutFile $msi `
-        -UseBasicParsing
-
-    # ------------------------------------------------------------
-    # Verify Authenticode signature.
-    # ------------------------------------------------------------
-
-    Write-Host `
-        '    Verifying Microsoft digital signature...'
-
-    $signature =
-        Get-AuthenticodeSignature `
-            -FilePath $msi
-
+    $signature = Get-AuthenticodeSignature -FilePath $msiPath
     if ($signature.Status -ne 'Valid') {
-
-        Remove-Item `
-            $msi `
-            -Force `
-            -ErrorAction SilentlyContinue
-
-        throw `
-            "WSL MSI signature validation failed: $($signature.Status)"
+        Remove-Item $msiPath -Force -ErrorAction SilentlyContinue
+        throw "WSL MSI signature validation failed: $($signature.Status)"
     }
 
-    if (
-        $signature.SignerCertificate.Subject `
-            -notmatch 'Microsoft'
-    ) {
-
-        Remove-Item `
-            $msi `
-            -Force `
-            -ErrorAction SilentlyContinue
-
-        throw `
-            'WSL MSI is not signed by a Microsoft certificate.'
+    if ($signature.SignerCertificate.Subject -notmatch 'Microsoft') {
+        Remove-Item $msiPath -Force -ErrorAction SilentlyContinue
+        throw 'WSL MSI is not signed by Microsoft.'
     }
 
-    Write-OK `
-        'Microsoft WSL package signature verified.'
+    $proc = Start-Process -FilePath msiexec.exe -ArgumentList "/i `"$msiPath`" /qn /norestart" -Wait -PassThru
+    Remove-Item $msiPath -Force -ErrorAction SilentlyContinue
 
-    $process =
-        Start-Process `
-            -FilePath 'msiexec.exe' `
-            -ArgumentList `
-                "/i `"$msi`" /qn /norestart" `
-            -Wait `
-            -PassThru
-
-    $code =
-        $process.ExitCode
-
-    Remove-Item `
-        $msi `
-        -Force `
-        -ErrorAction SilentlyContinue
-
-    if ($code -notin @(0, 3010)) {
-
-        throw `
-            "WSL MSI installation failed with exit code $code."
+    if ($proc.ExitCode -notin @(0, 3010)) {
+        throw "WSL MSI installation failed with exit code $($proc.ExitCode)."
     }
 
-    if ($code -eq 3010) {
-
+    if ($proc.ExitCode -eq 3010) {
         $script:RebootRequired = $true
-
-        Write-OK `
-            'WSL updated. Restart required.'
+        Write-OK 'WSL runtime installed. Restart required.'
     }
     else {
-
-        Write-OK `
-            'WSL updated.'
+        Write-OK 'WSL runtime installed.'
     }
 }
 
+function Get-UbuntuManifestImage {
+    $manifestUrl = 'https://raw.githubusercontent.com/microsoft/WSL/master/distributions/DistributionInfo.json'
+    $manifest = Invoke-RestMethod -Uri $manifestUrl -UseBasicParsing
 
-# ================================================================
-# UBUNTU INSTALLATION
-# ================================================================
+    $ubuntu = $manifest.ModernDistributions.Ubuntu | Where-Object { $_.Name -eq $DistroName } | Select-Object -First 1
+    if (-not $ubuntu) {
+        $ubuntu = $manifest.ModernDistributions.Ubuntu | Where-Object { $_.Name -eq 'Ubuntu' } | Select-Object -First 1
+    }
+
+    if (-not $ubuntu) {
+        throw 'Ubuntu distribution metadata not found in Microsoft WSL manifest.'
+    }
+
+    if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') {
+        return [pscustomobject]@{
+            Url    = $ubuntu.Arm64Url.Url
+            Sha256 = $ubuntu.Arm64Url.Sha256
+        }
+    }
+
+    return [pscustomobject]@{
+        Url    = $ubuntu.Amd64Url.Url
+        Sha256 = $ubuntu.Amd64Url.Sha256
+    }
+}
+
+function Install-UbuntuFromManifest {
+    $image = Get-UbuntuManifestImage
+    $wslFile = Join-Path $env:TEMP 'ubuntu-current.wsl'
+
+    Write-Host "    Download: $($image.Url)"
+    Invoke-WebRequest -Uri $image.Url -OutFile $wslFile -UseBasicParsing
+
+    $hash = (Get-FileHash -Path $wslFile -Algorithm SHA256).Hash
+    if ($hash.ToUpperInvariant() -ne $image.Sha256.ToUpperInvariant()) {
+        Remove-Item $wslFile -Force -ErrorAction SilentlyContinue
+        throw 'Ubuntu image SHA-256 verification failed.'
+    }
+
+    Write-OK 'Ubuntu image SHA-256 verified.'
+
+    & wsl.exe --install --from-file $wslFile --no-launch
+    $code = $LASTEXITCODE
+
+    Remove-Item $wslFile -Force -ErrorAction SilentlyContinue
+
+    if ($code -ne 0) {
+        throw "Ubuntu installation from verified image failed with exit code $code."
+    }
+}
 
 function Install-Ubuntu {
-
     if (Test-WSLDistro $DistroName) {
-
-        Write-OK `
-            'Ubuntu is already installed.'
-
+        Write-OK 'Ubuntu is already installed.'
         return
     }
 
-    Write-Step `
-        'Installing current Ubuntu LTS'
-
-    # ------------------------------------------------------------
-    # Preferred Microsoft WSL path.
-    # ------------------------------------------------------------
+    Write-Step 'Installing Ubuntu LTS'
 
     try {
-
-        & wsl.exe `
-            --install `
-            --distribution $DistroName `
-            --web-download `
-            --no-launch
-
+        & wsl.exe --install --distribution $DistroName --web-download --no-launch
         if ($LASTEXITCODE -eq 0) {
-
-            for ($i = 0; $i -lt 30; $i++) {
-
-                if (
-                    Test-WSLDistro `
-                        $DistroName
-                ) {
-
-                    Write-OK `
-                        'Ubuntu installed.'
-
+            for ($i = 0; $i -lt 60; $i++) {
+                if (Test-WSLDistro $DistroName) {
+                    Write-OK 'Ubuntu installed.'
                     return
                 }
-
                 Start-Sleep -Seconds 1
             }
         }
@@ -1147,203 +608,68 @@ function Install-Ubuntu {
     catch {
     }
 
-    Write-Warn `
-        'Standard Ubuntu installation did not complete.'
+    Write-Warn 'Standard wsl --install path did not complete; trying Microsoft manifest fallback.'
+    Install-UbuntuFromManifest
 
-    Write-Host `
-        'Using the current Microsoft Ubuntu distribution manifest.'
-
-    # ------------------------------------------------------------
-    # Microsoft DistributionInfo.json
-    # ------------------------------------------------------------
-
-    $manifestUrl =
-        'https://raw.githubusercontent.com/microsoft/WSL/master/distributions/DistributionInfo.json'
-
-    $manifest =
-        Invoke-RestMethod `
-            -Uri $manifestUrl `
-            -UseBasicParsing
-
-    $ubuntu =
-        $manifest.ModernDistributions.Ubuntu |
-        Where-Object {
-            $_.Name -eq 'Ubuntu'
-        } |
-        Select-Object -First 1
-
-    if ($null -eq $ubuntu) {
-
-        throw `
-            'The current Ubuntu distribution was not found in Microsoft WSL metadata.'
-    }
-
-    if (
-        $env:PROCESSOR_ARCHITECTURE -eq 'ARM64'
-    ) {
-
-        $image =
-            $ubuntu.Arm64Url
-    }
-    elseif (
-        $env:PROCESSOR_ARCHITECTURE -eq 'AMD64'
-    ) {
-
-        $image =
-            $ubuntu.Amd64Url
-    }
-    else {
-
-        throw `
-            "Unsupported architecture: $env:PROCESSOR_ARCHITECTURE"
-    }
-
-    $imageFile =
-        Join-Path `
-            $env:TEMP `
-            'ubuntu-current.wsl'
-
-    Write-Host ''
-    Write-Host `
-        "    Ubuntu image: $($image.Url)"
-
-    Invoke-WebRequest `
-        -Uri $image.Url `
-        -OutFile $imageFile `
-        -UseBasicParsing
-
-    Write-Host `
-        '    Verifying Ubuntu SHA-256...'
-
-    $hash =
-        (
-            Get-FileHash `
-                -Path $imageFile `
-                -Algorithm SHA256
-        ).Hash
-
-    if (
-        $hash.ToUpperInvariant() `
-        -ne `
-        $image.Sha256.ToUpperInvariant()
-    ) {
-
-        Remove-Item `
-            $imageFile `
-            -Force `
-            -ErrorAction SilentlyContinue
-
-        throw `
-            'Ubuntu image SHA-256 verification failed.'
-    }
-
-    Write-OK `
-        'Ubuntu image SHA-256 verified.'
-
-    & wsl.exe `
-        --install `
-        --from-file $imageFile `
-        --no-launch
-
-    $code =
-        $LASTEXITCODE
-
-    Remove-Item `
-        $imageFile `
-        -Force `
-        -ErrorAction SilentlyContinue
-
-    if ($code -ne 0) {
-
-        throw `
-            "Ubuntu installation from verified image failed. Exit code: $code"
-    }
-
-    Write-OK `
-        'Ubuntu installed from the verified current image.'
-}
-
-
-# ================================================================
-# WAIT FOR DISTRO
-# ================================================================
-
-function Wait-ForUbuntu {
-
-    Write-Step `
-        'Waiting for Ubuntu registration'
-
-    for ($i = 0; $i -lt 90; $i++) {
-
-        if (
-            Test-WSLDistro `
-                $DistroName
-        ) {
-
-            Write-OK `
-                'Ubuntu registration confirmed.'
-
+    for ($i = 0; $i -lt 60; $i++) {
+        if (Test-WSLDistro $DistroName) {
+            Write-OK 'Ubuntu installed.'
             return
         }
+        Start-Sleep -Seconds 1
+    }
 
+    throw 'Ubuntu did not register with WSL.'
+}
+
+function Wait-ForUbuntu {
+    Write-Step 'Waiting for Ubuntu registration'
+
+    for ($i = 0; $i -lt 90; $i++) {
+        if (Test-WSLDistro $DistroName) {
+            Write-OK 'Ubuntu registration confirmed.'
+            return
+        }
         Start-Sleep -Seconds 2
     }
 
-    throw `
-        'Ubuntu did not register with WSL within the expected time.'
+    throw 'Ubuntu did not register with WSL within the expected time.'
 }
 
-
-# ================================================================
-# CONFIGURE LINUX USER
-# ================================================================
-
-function Configure-LinuxUser {
-
+function Configure-UbuntuUser {
     param(
-        [string]$Username
+        [Parameter(Mandatory)] [string]$Username,
+        [Parameter(Mandatory)] [Security.SecureString]$Password
     )
 
-    $safeUsername =
-        $Username.Replace(
-            "'",
-            "'\''"
-        )
+    $plain = Convert-SecureStringToPlainText $Password
+    $safeUser = Escape-BashSingleQuote $Username
+    $safePass = Escape-BashSingleQuote $plain
 
-    $bashScript = @"
+    try {
+        $bash = @'
 set -e
+u='__USER__'
+p='__PASS__'
 
-USERNAME='$safeUsername'
-
-if ! id -u "`$USERNAME" >/dev/null 2>&1; then
-    useradd \
-        --create-home \
-        --shell /bin/bash \
-        --user-group \
-        "`$USERNAME"
+if ! id -u "$u" >/dev/null 2>&1; then
+    useradd --create-home --shell /bin/bash --user-group "$u"
 fi
 
-usermod -aG sudo "`$USERNAME"
+printf '%s:%s\n' "$u" "$p" | chpasswd
+usermod -aG sudo "$u" || true
 
 mkdir -p /etc/sudoers.d
+printf '%s\n' "$u ALL=(ALL) NOPASSWD:ALL" > "/etc/sudoers.d/90-$u"
+chmod 0440 "/etc/sudoers.d/90-$u"
 
-printf '%s\n' \
-    "`$USERNAME ALL=(ALL) NOPASSWD:ALL" \
-    > "/etc/sudoers.d/90-`$USERNAME"
-
-chmod 0440 "/etc/sudoers.d/90-`$USERNAME"
-
-mkdir -p "/home/`$USERNAME"
-
-chown -R \
-    "`$USERNAME:`$USERNAME" \
-    "/home/`$USERNAME"
-
-touch "/home/`$USERNAME/.hushlogin"
+mkdir -p "/home/$u"
+chown -R "$u:$u" "/home/$u"
+touch "/home/$u/.hushlogin"
 
 cat > /etc/wsl.conf <<EOF
 [user]
-default=`$USERNAME
+default=$u
 
 [boot]
 systemd=true
@@ -1356,850 +682,286 @@ appendWindowsPath=true
 enabled=true
 mountFsTab=false
 EOF
+'@
 
-echo USER_READY
-"@
+        $bash = $bash.Replace('__USER__', $safeUser).Replace('__PASS__', $safePass)
 
-    & wsl.exe `
-        --distribution $DistroName `
-        --user root `
-        --exec bash `
-        -c $bashScript
-
-    if ($LASTEXITCODE -ne 0) {
-
-        throw `
-            'Failed to configure the Linux user.'
-    }
-}
-
-
-# ================================================================
-# SET LINUX PASSWORD
-# ================================================================
-
-function Set-LinuxPassword {
-
-    param(
-        [string]$Username,
-
-        [Security.SecureString]$Password
-    )
-
-    $plain =
-        Convert-SecureStringToPlain `
-            $Password
-
-    try {
-
-        $inputLine =
-            "$Username`:$plain"
-
-        $inputLine |
-            & wsl.exe `
-                --distribution $DistroName `
-                --user root `
-                --exec chpasswd
+        & wsl.exe --distribution $DistroName --user root --exec bash -lc $bash
 
         if ($LASTEXITCODE -ne 0) {
-
-            throw `
-                "chpasswd failed with exit code $LASTEXITCODE."
+            throw "Linux user bootstrap failed with exit code $LASTEXITCODE."
         }
     }
     finally {
-
         $plain = $null
-        $inputLine = $null
+        $bash = $null
     }
 }
 
+function Validate-WslStatus {
+    Write-Step 'Final WSL status'
+
+    Write-Host ''
+    Write-Host 'WSL STATUS' -ForegroundColor Cyan
+    Write-Host '----------'
+    & wsl.exe --status
+
+    Write-Host ''
+    Write-Host 'DISTRIBUTIONS' -ForegroundColor Cyan
+    Write-Host '-------------'
+    & wsl.exe --list --verbose
+
+    Write-Host ''
+    Write-Host 'WSL VERSION' -ForegroundColor Cyan
+    Write-Host '-----------'
+    & wsl.exe --version
+}
+
+function Cleanup-Success {
+    Remove-CloudInit
+    Remove-ResumeTask
+    Remove-StateFiles
+}
+
+# ================================================================
+# SELF-MATERIALIZE + ELEVATE
+# ================================================================
+
+$script:InstallerScriptPath = Get-InstallerScriptPath
+
+if (-not (Test-Administrator)) {
+    Write-Host ''
+    Write-Host 'Administrator privileges are required.' -ForegroundColor Yellow
+    Write-Host 'Requesting Administrator elevation...' -ForegroundColor Cyan
+    Write-Host ''
+    Invoke-SelfRelaunch -ScriptPath $script:InstallerScriptPath -RunAs
+}
 
 # ================================================================
 # MAIN
 # ================================================================
 
 try {
-
     Write-Host ''
-    Write-Host `
-        '============================================================' `
-        -ForegroundColor Cyan
-
-    Write-Host `
-        '             WSL 2 + UBUNTU LTS INSTALLER' `
-        -ForegroundColor Cyan
-
-    Write-Host `
-        '============================================================' `
-        -ForegroundColor Cyan
-
+    Write-Host '============================================================' -ForegroundColor Cyan
+    Write-Host '             WSL 2 + UBUNTU LTS INSTALLER' -ForegroundColor Cyan
+    Write-Host '============================================================' -ForegroundColor Cyan
     Write-Host ''
 
-    Write-OK `
-        'Administrator privileges confirmed.'
+    Write-OK 'Administrator privileges confirmed.'
 
+    Write-Step 'Checking Windows compatibility'
+    $os = Get-CimInstance Win32_OperatingSystem
+    $build = [int]$os.BuildNumber
 
-    # ============================================================
-    # WINDOWS VERSION
-    # ============================================================
+    Write-Host "    Operating System : $($os.Caption)"
+    Write-Host "    Build            : $build"
+    Write-Host "    Architecture     : $env:PROCESSOR_ARCHITECTURE"
 
-    Write-Step `
-        'Checking Windows compatibility'
-
-    $OS =
-        Get-CimInstance `
-            Win32_OperatingSystem
-
-    $Build =
-        [int]$OS.BuildNumber
-
-    Write-Host `
-        "    Operating System : $($OS.Caption)"
-
-    Write-Host `
-        "    Build            : $Build"
-
-    Write-Host `
-        "    Architecture     : $env:PROCESSOR_ARCHITECTURE"
-
-    if ($Build -lt 19041) {
-
-        throw `
-            'Windows 10 build 19041+ or Windows 11 is required.'
+    if ($build -lt 19041) {
+        throw 'Windows 10 build 19041+ or Windows 11 is required.'
     }
 
-    Write-OK `
-        'Supported Windows version detected.'
+    Write-OK 'Supported Windows version detected.'
 
-
-    # ============================================================
-    # USER CREDENTIALS
-    # ============================================================
-
-    $state =
-        Get-State
-
-    if (
-        $null -ne $state -and
-        $state.Stage -eq 'RebootPending'
-    ) {
-
-        $script:LinuxUsername =
-            $state.Username
-
-        $script:LinuxPassword =
-            Get-SavedPassword
+    # Resume or prompt for credentials.
+    $state = Get-State
+    if ($null -ne $state -and $state.Stage -eq 'RebootPending') {
+        $script:LinuxUsername = $state.Username
+        $script:LinuxPassword = Get-SavedPassword
 
         Write-Host ''
+        Write-OK "Resuming installation for Linux user '$script:LinuxUsername'."
 
-        Write-OK `
-            "Resuming installation for '$LinuxUsername'."
-
-        if ($null -eq $LinuxPassword) {
-
-            Write-Warn `
-                'Saved password could not be recovered.'
-
-            $script:LinuxPassword =
-                Read-Host `
-                    'Enter Linux password' `
-                    -AsSecureString
+        if ($null -eq $script:LinuxPassword) {
+            Write-Warn 'Saved password could not be recovered.'
+            $script:LinuxPassword = Read-Host 'Enter Linux password' -AsSecureString
         }
     }
     else {
-
-        Write-Step `
-            'Linux account setup'
-
+        Write-Step 'Linux account setup'
         Write-Host ''
-        Write-Host `
-            'Choose the Linux username and password.'
-
-        Write-Host ''
-        Write-Host `
-            'Press Enter for username "dev".'
-
+        Write-Host 'Choose the Linux username and password for Ubuntu.'
+        Write-Host 'Press Enter to use the default username: dev'
         Write-Host ''
 
         do {
-
-            $script:LinuxUsername =
-                Read-Host `
-                    'Linux username [dev]'
-
-            if (
-                [string]::IsNullOrWhiteSpace(
-                    $LinuxUsername
-                )
-            ) {
-
-                $script:LinuxUsername =
-                    'dev'
+            $script:LinuxUsername = Read-Host 'Linux username [dev]'
+            if ([string]::IsNullOrWhiteSpace($script:LinuxUsername)) {
+                $script:LinuxUsername = 'dev'
             }
 
-            if (
-                -not (
-                    Test-LinuxUsername `
-                        $LinuxUsername
-                )
-            ) {
-
-                Write-Warn `
-                    'Invalid Linux username.'
-
+            if (-not (Test-LinuxUsername $script:LinuxUsername)) {
+                Write-Warn 'Invalid Linux username. Use lowercase letters, numbers, _ or -.'
                 $script:LinuxUsername = $null
             }
-
         }
-        while (
-            [string]::IsNullOrWhiteSpace(
-                $LinuxUsername
-            )
-        )
-
+        while ([string]::IsNullOrWhiteSpace($script:LinuxUsername))
 
         do {
+            $script:LinuxPassword = Read-Host 'Linux password' -AsSecureString
+            $confirm = Read-Host 'Confirm Linux password' -AsSecureString
 
-            $script:LinuxPassword =
-                Read-Host `
-                    'Linux password' `
-                    -AsSecureString
+            $p1 = Convert-SecureStringToPlainText $script:LinuxPassword
+            $p2 = Convert-SecureStringToPlainText $confirm
 
-            $confirm =
-                Read-Host `
-                    'Confirm Linux password' `
-                    -AsSecureString
-
-            $password1 =
-                Convert-SecureStringToPlain `
-                    $LinuxPassword
-
-            $password2 =
-                Convert-SecureStringToPlain `
-                    $confirm
-
-            $match =
-                (
-                    $password1.Length -gt 0 -and
-                    $password1 -eq $password2
-                )
-
-            $password1 = $null
-            $password2 = $null
+            $match = ($p1.Length -gt 0 -and $p1 -eq $p2)
+            $p1 = $null
+            $p2 = $null
 
             if (-not $match) {
-
-                Write-Warn `
-                    'Passwords do not match.'
+                Write-Warn 'Passwords do not match.'
             }
-
         }
         while (-not $match)
 
-        Write-OK `
-            "Linux username: $LinuxUsername"
-
-        Write-OK `
-            'Linux password accepted.'
+        Write-OK "Linux username: $script:LinuxUsername"
+        Write-OK 'Linux password accepted.'
     }
 
+    # Cloud-init file prepared before install, as recommended by Ubuntu docs.
+    New-CloudInit -Username $script:LinuxUsername
 
-    # ============================================================
-    # WINDOWS FEATURES
-    # ============================================================
-
-    Write-Step `
-        'Checking WSL Windows features'
-
-    $WSLFeature =
-        Get-WindowsOptionalFeature `
-            -Online `
-            -FeatureName `
-                Microsoft-Windows-Subsystem-Linux
-
-    $VMFeature =
-        Get-WindowsOptionalFeature `
-            -Online `
-            -FeatureName `
-                VirtualMachinePlatform
+    Write-Step 'Checking WSL Windows features'
+    $wslFeature = Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Windows-Subsystem-Linux
+    $vmFeature = Get-WindowsOptionalFeature -Online -FeatureName VirtualMachinePlatform
 
     Write-Host ''
-    Write-Host `
-        "    WSL               : $($WSLFeature.State)"
+    Write-Host "    WSL               : $($wslFeature.State)"
+    Write-Host "    Virtual Machine   : $($vmFeature.State)"
 
-    Write-Host `
-        "    Virtual Machine   : $($VMFeature.State)"
-
-
-    if (
-        $WSLFeature.State -ne 'Enabled'
-    ) {
-
-        Enable-WindowsFeatureSafe `
-            -FeatureName `
-                'Microsoft-Windows-Subsystem-Linux'
+    if ($wslFeature.State -ne 'Enabled') {
+        Enable-WindowsFeatureSafe -FeatureName 'Microsoft-Windows-Subsystem-Linux'
     }
     else {
-
-        Write-OK `
-            'Windows Subsystem for Linux already enabled.'
+        Write-OK 'Windows Subsystem for Linux already enabled.'
     }
 
-
-    if (
-        $VMFeature.State -ne 'Enabled'
-    ) {
-
-        Enable-WindowsFeatureSafe `
-            -FeatureName `
-                'VirtualMachinePlatform'
+    if ($vmFeature.State -ne 'Enabled') {
+        Enable-WindowsFeatureSafe -FeatureName 'VirtualMachinePlatform'
     }
     else {
-
-        Write-OK `
-            'Virtual Machine Platform already enabled.'
+        Write-OK 'Virtual Machine Platform already enabled.'
     }
-
-
-    # ============================================================
-    # HYPERVISOR
-    # ============================================================
 
     Ensure-HypervisorLaunch
 
-
-    # ============================================================
-    # REBOOT
-    # ============================================================
-
-    if (
-        $script:RebootRequired -or
-        (Test-WindowsRebootRequired)
-    ) {
-
+    if ($script:RebootRequired -or (Test-WindowsRebootRequired)) {
         Restart-AndResume
     }
 
-
-    # ============================================================
-    # WSL UPDATE
-    # ============================================================
-
-    Update-WSL
-
+    Update-WSLRuntime
 
     if ($script:RebootRequired) {
-
         Restart-AndResume
     }
 
-
-    # ============================================================
-    # WSL 2 DEFAULT
-    # ============================================================
-
-    Write-Step `
-        'Configuring WSL 2'
-
-    & wsl.exe `
-        --set-default-version `
-        2
-
+    Write-Step 'Setting WSL 2 as the default version'
+    & wsl.exe --set-default-version 2
     if ($LASTEXITCODE -ne 0) {
-
-        Write-Warn `
-            'Initial WSL 2 configuration failed.'
-
-        Update-WSL
-
-        if ($script:RebootRequired) {
-
-            Restart-AndResume
-        }
-
-        & wsl.exe `
-            --set-default-version `
-            2
-
-        if ($LASTEXITCODE -ne 0) {
-
-            throw `
-                'Unable to configure WSL 2 as the default version.'
-        }
+        throw 'Unable to set WSL 2 as the default version.'
     }
-
-    Write-OK `
-        'WSL 2 configured as the default version.'
-
-
-    # ============================================================
-    # CLOUD INIT
-    # ============================================================
-
-    $UbuntuExists =
-        Test-WSLDistro `
-            $DistroName
-
-    if (-not $UbuntuExists) {
-
-        Write-Step `
-            'Preparing unattended Ubuntu provisioning'
-
-        New-CloudInit `
-            -Username $LinuxUsername
-    }
-
-
-    # ============================================================
-    # UBUNTU
-    # ============================================================
+    Write-OK 'WSL 2 configured as the default version.'
 
     Install-Ubuntu
-
     Wait-ForUbuntu
 
-
-    # ============================================================
-    # FORCE UBUNTU WSL 2
-    # ============================================================
-
-    Write-Step `
-        'Validating Ubuntu WSL version'
-
-    $UbuntuVersion =
-        Get-WSLDistroVersion `
-            -Name $DistroName
-
-    if ($UbuntuVersion -eq 1) {
-
-        Write-Warn `
-            'Ubuntu is WSL 1.'
-
-        Write-Host `
-            'Converting Ubuntu to WSL 2...'
-
-        & wsl.exe `
-            --set-version `
-            $DistroName `
-            2
-
+    Write-Step 'Validating Ubuntu WSL version'
+    $ubuntuVersion = Get-WSLDistroVersion -Name $DistroName
+    if ($ubuntuVersion -eq 1) {
+        Write-Warn 'Ubuntu is currently WSL 1. Converting to WSL 2...'
+        & wsl.exe --set-version $DistroName 2
         if ($LASTEXITCODE -ne 0) {
-
-            throw `
-                'Failed to convert Ubuntu to WSL 2.'
+            throw 'Failed to convert Ubuntu to WSL 2.'
         }
-
-        Write-OK `
-            'Ubuntu converted to WSL 2.'
+        Write-OK 'Ubuntu converted to WSL 2.'
     }
-    elseif ($UbuntuVersion -eq 2) {
-
-        Write-OK `
-            'Ubuntu is already WSL 2.'
+    elseif ($ubuntuVersion -eq 2) {
+        Write-OK 'Ubuntu is already WSL 2.'
     }
     else {
-
-        throw `
-            'Unable to determine the Ubuntu WSL version.'
+        throw 'Unable to determine the Ubuntu WSL version.'
     }
 
-
-    # ============================================================
-    # START ROOT SESSION
-    # ============================================================
-
-    Write-Step `
-        'Starting Ubuntu provisioning'
-
-    & wsl.exe `
-        --distribution $DistroName `
-        --user root `
-        --exec true
-
+    Write-Step 'Starting Ubuntu provisioning'
+    & wsl.exe --distribution $DistroName --user root --exec true
     if ($LASTEXITCODE -ne 0) {
-
-        throw `
-            'Ubuntu could not start.'
+        throw 'Ubuntu could not start.'
     }
 
+    Configure-UbuntuUser -Username $script:LinuxUsername -Password $script:LinuxPassword
+    Write-OK "Linux user '$script:LinuxUsername' configured."
 
-    # ============================================================
-    # WAIT FOR CLOUD INIT USER
-    # ============================================================
-
-    if (-not $UbuntuExists) {
-
-        Write-Step `
-            'Waiting for Ubuntu cloud-init'
-
-        $cloudUserReady = $false
-
-        for ($i = 0; $i -lt 120; $i++) {
-
-            & wsl.exe `
-                --distribution $DistroName `
-                --user root `
-                --exec bash `
-                -c `
-                "id -u '$LinuxUsername' >/dev/null 2>&1" `
-                2>$null
-
-            if ($LASTEXITCODE -eq 0) {
-
-                $cloudUserReady = $true
-                break
-            }
-
-            Start-Sleep -Seconds 2
-        }
-
-        if ($cloudUserReady) {
-
-            Write-OK `
-                'Ubuntu cloud-init user provisioning completed.'
-        }
-        else {
-
-            Write-Warn `
-                'Cloud-init did not create the user.'
-
-            Write-Warn `
-                'Direct root provisioning will create it.'
-        }
-    }
-
-
-    # ============================================================
-    # USER CONFIGURATION
-    # ============================================================
-
-    Write-Step `
-        'Configuring Linux user'
-
-    Configure-LinuxUser `
-        -Username $LinuxUsername
-
-    Write-OK `
-        "Linux user '$LinuxUsername' configured."
-
-
-    # ============================================================
-    # PASSWORD
-    # ============================================================
-
-    Write-Step `
-        'Setting Linux password'
-
-    Set-LinuxPassword `
-        -Username $LinuxUsername `
-        -Password $LinuxPassword
-
-    Write-OK `
-        'Linux password configured.'
-
-
-    # ============================================================
-    # RESTART WSL
-    # ============================================================
-
-    Write-Step `
-        'Restarting WSL'
-
-    & wsl.exe `
-        --shutdown
-
+    Write-Step 'Restarting WSL'
+    & wsl.exe --shutdown
     Start-Sleep -Seconds 3
+    Write-OK 'WSL restarted.'
 
-    Write-OK `
-        'WSL restarted.'
-
-
-    # ============================================================
-    # DEFAULT DISTRIBUTION
-    # ============================================================
-
-    Write-Step `
-        'Setting Ubuntu as default distribution'
-
-    & wsl.exe `
-        --set-default `
-        $DistroName
-
+    Write-Step 'Setting Ubuntu as the default distribution'
+    & wsl.exe --set-default $DistroName
     if ($LASTEXITCODE -ne 0) {
-
-        throw `
-            'Unable to set Ubuntu as the default distribution.'
+        throw 'Unable to set Ubuntu as the default distribution.'
     }
+    Write-OK 'Ubuntu is the default distribution.'
 
-    Write-OK `
-        'Ubuntu is the default distribution.'
-
-
-    # ============================================================
-    # USER VALIDATION
-    # ============================================================
-
-    Write-Step `
-        'Validating default Linux user'
-
-    $DetectedUser =
-        (
-            & wsl.exe `
-                --distribution $DistroName `
-                --exec whoami `
-                2>$null |
-            Select-Object -First 1
-        ).ToString().Trim()
-
-    if (
-        $DetectedUser -ne
-        $LinuxUsername
-    ) {
-
-        throw `
-            "Default user validation failed. Expected '$LinuxUsername', got '$DetectedUser'."
+    Write-Step 'Validating default Linux user'
+    $detectedUser = (& wsl.exe --distribution $DistroName --exec whoami 2>$null | Select-Object -First 1).ToString().Trim()
+    if ($detectedUser -ne $script:LinuxUsername) {
+        throw "Default user validation failed. Expected '$script:LinuxUsername', got '$detectedUser'."
     }
+    Write-OK "Default Linux user: $script:LinuxUsername"
 
-    Write-OK `
-        "Default Linux user: $LinuxUsername"
-
-
-    # ============================================================
-    # WSL 2 FINAL VALIDATION
-    # ============================================================
-
-    Write-Step `
-        'Performing final WSL 2 validation'
-
-    $FinalVersion =
-        Get-WSLDistroVersion `
-            -Name $DistroName
-
-    if ($FinalVersion -ne 2) {
-
-        throw `
-            "Ubuntu is not running WSL 2. Detected version: $FinalVersion"
-    }
-
-    Write-OK `
-        'Ubuntu is running WSL 2.'
-
-
-    # ============================================================
-    # SUDO VALIDATION
-    # ============================================================
-
-    Write-Step `
-        'Validating sudo'
-
-    & wsl.exe `
-        --distribution $DistroName `
-        --exec sudo `
-        -n `
-        true `
-        2>$null
-
+    Write-Step 'Validating sudo'
+    & wsl.exe --distribution $DistroName --exec sudo -n true 2>$null
     if ($LASTEXITCODE -ne 0) {
-
-        throw `
-            'sudo validation failed.'
+        throw 'sudo validation failed.'
     }
+    Write-OK 'sudo is configured.'
 
-    Write-OK `
-        'sudo is configured.'
-
-
-    # ============================================================
-    # FINAL STATUS
-    # ============================================================
-
-    Write-Step `
-        'Final WSL status'
-
-    Write-Host ''
-    Write-Host `
-        'WSL STATUS' `
-        -ForegroundColor Cyan
-
-    Write-Host `
-        '----------'
-
-    & wsl.exe `
-        --status
-
-    Write-Host ''
-    Write-Host `
-        'DISTRIBUTIONS' `
-        -ForegroundColor Cyan
-
-    Write-Host `
-        '-------------'
-
-    & wsl.exe `
-        --list `
-        --verbose
-
-    Write-Host ''
-    Write-Host `
-        'WSL VERSION' `
-        -ForegroundColor Cyan
-
-    Write-Host `
-        '-----------'
-
-    & wsl.exe `
-        --version
-
-
-    # ============================================================
-    # CLEANUP
-    # ============================================================
-
-    Write-Step `
-        'Cleaning temporary installer data'
-
-    Remove-CloudInit
-
-    Remove-ResumeTask
-
-
-    Remove-Item `
-        $StateFile `
-        -Force `
-        -ErrorAction SilentlyContinue
-
-    Remove-Item `
-        $PasswordFile `
-        -Force `
-        -ErrorAction SilentlyContinue
-
-    Remove-Item `
-        $InstallerFile `
-        -Force `
-        -ErrorAction SilentlyContinue
-
-
-    try {
-    if (
-        (Test-Path $StateRoot) -and
-        (
-            @(
-                Get-ChildItem `
-                    $StateRoot `
-                    -Force `
-                    -ErrorAction SilentlyContinue
-            ).Count -eq 0
-        )
-    ) {
-
-        Remove-Item `
-            $StateRoot `
-            -Force `
-            -ErrorAction SilentlyContinue
+    $finalVersion = Get-WSLDistroVersion -Name $DistroName
+    if ($finalVersion -ne 2) {
+        throw "Ubuntu is not running WSL 2. Detected version: $finalVersion"
     }
-}
-catch {
-}
+    Write-OK 'Ubuntu is running WSL 2.'
 
+    Validate-WslStatus
 
-    # ============================================================
-    # SUCCESS
-    # ============================================================
+    Write-Step 'Cleaning temporary setup data'
+    Cleanup-Success
 
     Write-Host ''
-    Write-Host `
-        '============================================================' `
-        -ForegroundColor Green
-
-    Write-Host `
-        '              INSTALLATION COMPLETE' `
-        -ForegroundColor Green
-
-    Write-Host `
-        '============================================================' `
-        -ForegroundColor Green
-
+    Write-Host '============================================================' -ForegroundColor Green
+    Write-Host '              INSTALLATION COMPLETE' -ForegroundColor Green
+    Write-Host '============================================================' -ForegroundColor Green
     Write-Host ''
-
-    Write-Host `
-        "Distribution : $DistroName"
-
-    Write-Host `
-        'WSL Version  : 2'
-
-    Write-Host `
-        "Linux User   : $LinuxUsername"
-
+    Write-Host "Ubuntu      : $DistroName"
+    Write-Host 'WSL Version : 2'
+    Write-Host "Linux User  : $script:LinuxUsername"
     Write-Host ''
-
-    Write-Host `
-        'Launch Ubuntu:' `
-        -ForegroundColor Cyan
-
+    Write-Host 'Start Ubuntu:' -ForegroundColor Cyan
+    Write-Host '    wsl'
     Write-Host ''
-    Write-Host `
-        '    wsl'
-
-    Write-Host ''
-
-    Write-Host `
-        'Verify:' `
-        -ForegroundColor Cyan
-
-    Write-Host ''
-    Write-Host `
-        '    wsl -l -v'
-
-    Write-Host `
-        '    wsl --status'
-
+    Write-Host 'Verify:' -ForegroundColor Cyan
+    Write-Host '    wsl -l -v'
+    Write-Host '    wsl --status'
     Write-Host ''
 
     exit 0
 }
 catch {
-
     Write-Host ''
-    Write-Host `
-        '============================================================' `
-        -ForegroundColor Red
-
-    Write-Host `
-        '              INSTALLATION FAILED' `
-        -ForegroundColor Red
-
-    Write-Host `
-        '============================================================' `
-        -ForegroundColor Red
-
+    Write-Host '============================================================' -ForegroundColor Red
+    Write-Host '              INSTALLATION FAILED' -ForegroundColor Red
+    Write-Host '============================================================' -ForegroundColor Red
     Write-Host ''
-
-    Write-Fail `
-        $_.Exception.Message
-
+    Write-Fail $_.Exception.Message
     Write-Host ''
-
-    Write-Host `
-        'Diagnostics:' `
-        -ForegroundColor Yellow
-
+    Write-Host 'Diagnostics:' -ForegroundColor Yellow
+    Write-Host '    wsl --status'
+    Write-Host '    wsl --version'
+    Write-Host '    wsl -l -v'
     Write-Host ''
-    Write-Host `
-        '    wsl --status'
-
-    Write-Host `
-        '    wsl --version'
-
-    Write-Host `
-        '    wsl -l -v'
-
+    Write-Warn 'The installer can be run again safely.'
     Write-Host ''
-
-    Write-Warn `
-        'The installer can be run again safely.'
-
-    Write-Host ''
-
     exit 1
 }
