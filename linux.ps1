@@ -2081,27 +2081,26 @@ try {
 
 
     try {
+    if (
+        (Test-Path $StateRoot) -and
+        (
+            @(
+                Get-ChildItem `
+                    $StateRoot `
+                    -Force `
+                    -ErrorAction SilentlyContinue
+            ).Count -eq 0
+        )
+    ) {
 
-        if (
-            Test-Path $StateRoot -and
-            (
-                @(
-                    Get-ChildItem `
-                        $StateRoot `
-                        -Force `
-                        -ErrorAction SilentlyContinue
-                ).Count -eq 0
-            )
-        ) {
-
-            Remove-Item `
-                $StateRoot `
-                -Force `
-                -ErrorAction SilentlyContinue
-        }
+        Remove-Item `
+            $StateRoot `
+            -Force `
+            -ErrorAction SilentlyContinue
     }
-    catch {
-    }
+}
+catch {
+}
 
 
     # ============================================================
