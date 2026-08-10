@@ -1,5 +1,4 @@
-```powershell
-#requires -Version 5.1
+
 
 <#
     WSL 2 + Ubuntu 26.04 LTS Automated Installer
@@ -1465,4 +1464,3 @@ catch {
 
     exit 1
 }
-```
